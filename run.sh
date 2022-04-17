@@ -11,4 +11,8 @@ elif [ $1 == "--scan" ]
 then
     . scan.env
     yarn scan
+elif [ $1 == "--check-hit" ]
+then
+    . check-hit.env
+    yarn check-hit
 fi

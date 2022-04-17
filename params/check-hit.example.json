@@ -1,0 +1,64 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 15000,
+    "batch": 1,
+    "assets": {
+        "BTC": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "SOL": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "ETH": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "AVAX": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "LUNA": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "BNB": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "MNGO": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "ADA": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "RAY": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "SRM": {
+            "perp": {
+                "size": 0
+            }
+        },
+        "FTT": {
+            "perp": {
+                "size": 0
+            }
+        }
+    }
+}
