@@ -1,0 +1,131 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 3000,
+    "averageTPS": 100000,
+    "batch": 2,
+    "assets": {
+        "BTC": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 100000
+            }
+        },
+        "ETH": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 100000
+            }
+        },
+        "SOL": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 100000
+            }
+        },
+        "LUNA": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 100000
+            }
+        },
+        "AVAX": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 100000
+            }
+        },
+        "BNB": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 100000
+            }
+        },
+        "ADA": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 50000
+            }
+        },
+        "FTT": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 20000
+            }
+        },
+        "SRM": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 10000
+            }
+        },
+        "RAY": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 10000
+            }
+        },
+        "MNGO": {
+            "perp": {
+                "isCancel": true,
+                "room": 0.5,
+                "timeToLive": 60,
+                "bidCharge": 0.0001,
+                "askCharge": 0.0001,
+                "checkRoom": true,
+                "ftxSize": 5000
+            }
+        }
+    }
+}

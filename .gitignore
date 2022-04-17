@@ -1,3 +1,10 @@
+# Customize
+id.json
+params/*.json
+!params/*.example.json
+*.env
+!*example.env
+
 # Logs
 logs
 *.log

@@ -1,3 +1,6 @@
 #!/bin/bash
-. .env
-yarn mm
+if [ $1 == "--cancel" ]
+then
+    . cancel.env
+    yarn cancel
+fi
