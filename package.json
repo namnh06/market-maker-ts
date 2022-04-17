@@ -9,7 +9,8 @@
     "mm": "ts-node src/mm.ts",
     "scratch": "ts-node src/scratch.ts",
     "format": "prettier --check .",
-    "cancel": "ts-node src/cancel.ts"
+    "cancel": "ts-node src/cancel.ts",
+    "wash": "ts-node src/wash.ts"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",

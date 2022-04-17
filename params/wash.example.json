@@ -1,0 +1,87 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 3000,
+    "averageTPS": 100000,
+    "batch": 2,
+    "assets": {
+        "BTC": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 100000,
+                "forceTrade": true
+            }
+        },
+        "ETH": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 100000,
+                "forceTrade": true
+            }
+        },
+        "SOL": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 100000,
+                "forceTrade": true
+            }
+        },
+        "LUNA": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 100000,
+                "forceTrade": true
+            }
+        },
+        "AVAX": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 100000,
+                "forceTrade": true
+            }
+        },
+        "BNB": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 100000,
+                "forceTrade": true
+            }
+        },
+        "ADA": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 50000,
+                "forceTrade": true
+            }
+        },
+        "FTT": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 20000,
+                "forceTrade": true
+            }
+        },
+        "SRM": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 10000,
+                "forceTrade": true
+            }
+        },
+        "RAY": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 10000,
+                "forceTrade": true
+            }
+        },
+        "MNGO": {
+            "perp": {
+                "acceptableBPS": 100,
+                "ftxSize": 5000,
+                "forceTrade": true
+            }
+        }
+    }
+}
