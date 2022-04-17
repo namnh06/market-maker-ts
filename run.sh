@@ -7,4 +7,8 @@ elif [ $1 == "--wash" ]
 then
     . wash.env
     yarn wash
+elif [ $1 == "--scan" ]
+then
+    . scan.env
+    yarn scan
 fi

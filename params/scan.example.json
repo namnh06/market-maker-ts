@@ -1,0 +1,111 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 900000,
+    "batch": 1,
+    "isFull": false,
+    "isIOC": false,
+    "isNeutral": false,
+    "assets": {
+        "BTC": {
+            "perp": {
+                "priceRange": 0.015,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "ETH": {
+            "perp": {
+                "priceRange": 0.015,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "SOL": {
+            "perp": {
+                "priceRange": 0.01,
+                "isScan": true,
+                "maxDepthMax": 0.5,
+                "isIOC": true,
+                "isNeutral": true
+            }
+        },
+        "LUNA": {
+            "perp": {
+                "priceRange": 0.03,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "AVAX": {
+            "perp": {
+                "priceRange": 0.03,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "BNB": {
+            "perp": {
+                "priceRange": 0.03,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "ADA": {
+            "perp": {
+                "priceRange": 0.03,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "FTT": {
+            "perp": {
+                "priceRange": 0.03,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "SRM": {
+            "perp": {
+                "priceRange": 0.05,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "RAY": {
+            "perp": {
+                "priceRange": 0.05,
+                "isScan": true,
+                "maxDepthMax": 0.6,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        },
+        "MNGO": {
+            "perp": {
+                "priceRange": 0.05,
+                "isScan": true,
+                "maxDepthMax": 0.8,
+                "isIOC": false,
+                "isNeutral": false
+            }
+        }
+    }
+}
