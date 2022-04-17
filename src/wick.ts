@@ -598,11 +598,11 @@ function makeMarketUpdateInstructions(
         bidCharge += 0.005;
         askCharge += 0.005;
     } else if (averageTPS < 50000) {
-        bidCharge += 0.002;
-        askCharge += 0.002;
-    } else if (averageTPS < 100000) {
         bidCharge += 0.003;
         askCharge += 0.003;
+    } else if (averageTPS < 100000) {
+        bidCharge += 0.001;
+        askCharge += 0.001;
     }
 
     const requoteThresh = marketContext.params.requoteThresh;
