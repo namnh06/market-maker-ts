@@ -15,4 +15,8 @@ elif [ $1 == "--check-hit" ]
 then
     . check-hit.env
     yarn check-hit
+elif [ $1 == "--wick" ]
+then
+    . wick.env
+    yarn wick
 fi

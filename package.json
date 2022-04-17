@@ -12,7 +12,8 @@
     "cancel": "ts-node src/cancel.ts",
     "wash": "ts-node src/wash.ts",
     "scan": "ts-node src/scan.ts",
-    "check-hit": "ts-node src/check-hit.ts"
+    "check-hit": "ts-node src/check-hit.ts",
+    "wick": "ts-node src/wick.ts"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
