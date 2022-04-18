@@ -358,13 +358,10 @@ async function mainCancel() {
             const selfConnection = new Connection(
                 process.env.ENDPOINT_URL || config.cluster_urls[cluster]
             );
-            const perfSamples = await selfConnection.getRecentPerformanceSamples();
-            const data = perfSamples.sort(function (a, b) {
-                return b.slot - a.slot;
-            }).slice(0, 10);
+            const perfSamples = await selfConnection.getRecentPerformanceSamples(3);
             const averageTPS = Math.ceil(
-                data.map((x) => x.numTransactions)
-                    .reduce((a, b) => a + b, 0) / data.length
+                perfSamples.map((x) => x.numTransactions / x.samplePeriodSecs)
+                    .reduce((a, b) => a + b, 0) / 3
             );
 
             mangoAccount = state.mangoAccount;
@@ -615,13 +612,13 @@ function makeMarketUpdateInstructions(
 
     let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
     let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-    if (averageTPS < 20000) {
+    if (averageTPS < 500) {
         bidCharge += 0.002;
         askCharge += 0.002;
-    } else if (averageTPS < 50000) {
+    } else if (averageTPS < 1000) {
         bidCharge += 0.001;
         askCharge += 0.001;
-    } else if (averageTPS < 100000) {
+    } else if (averageTPS < 1500) {
         bidCharge += 0.0005;
         askCharge += 0.0005;
     }

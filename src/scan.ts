@@ -231,17 +231,13 @@ async function fullScan() {
 
     // Create your bot and tell it about your context type
     while (control.isRunning) {
-        console.log(`---BEGIN---`);
         const selfConnection = new Connection(
             process.env.ENDPOINT_URL || config.cluster_urls[cluster]
         );
-        const perfSamples = await selfConnection.getRecentPerformanceSamples();
-        const data = perfSamples.sort(function (a, b) {
-            return b.slot - a.slot;
-        }).slice(0, 10);
+        const perfSamples = await selfConnection.getRecentPerformanceSamples(3);
         const averageTPS = Math.ceil(
-            data.map((x) => x.numTransactions)
-                .reduce((a, b) => a + b, 0) / data.length
+            perfSamples.map((x) => x.numTransactions / x.samplePeriodSecs)
+                .reduce((a, b) => a + b, 0) / 3
         );
 
         try {

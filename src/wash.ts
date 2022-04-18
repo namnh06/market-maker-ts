@@ -364,13 +364,10 @@ async function washTrade() {
             const selfConnection = new Connection(
                 process.env.ENDPOINT_URL || config.cluster_urls[cluster]
             );
-            const perfSamples = await selfConnection.getRecentPerformanceSamples();
-            const data = perfSamples.sort(function (a, b) {
-                return b.slot - a.slot;
-            }).slice(0, 10);
+            const perfSamples = await selfConnection.getRecentPerformanceSamples(3);
             const averageTPS = Math.ceil(
-                data.map((x) => x.numTransactions)
-                    .reduce((a, b) => a + b, 0) / data.length
+                perfSamples.map((x) => x.numTransactions / x.samplePeriodSecs)
+                    .reduce((a, b) => a + b, 0) / 3
             );
 
             for (let i = 0; i < marketContexts.length; i++) {

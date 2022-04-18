@@ -3,7 +3,7 @@
     "mangoAccountName": "",
     "mangoAccountPubkey": "",
     "interval": 3000,
-    "averageTPS": 100000,
+    "averageTPS": 1000,
     "batch": 2,
     "assets": {
         "BTC": {

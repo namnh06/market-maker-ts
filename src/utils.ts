@@ -122,3 +122,18 @@ export function listenersArray(
   const difference = assetNames.filter((x) => !inProc.includes(x));
   return processes.concat([difference]);
 }
+
+/** CUSTOM */
+export function percentageVolatility(a, b) {
+  let percent;
+  if (b !== 0) {
+    if (a !== 0) {
+      percent = (b - a) / a * 100;
+    } else {
+      percent = b * 100;
+    }
+  } else {
+    percent = - a * 100;
+  }
+  return Math.abs(percent);
+}

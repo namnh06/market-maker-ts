@@ -45,8 +45,11 @@ import {
     makeInitSequenceInstruction,
     seqEnforcerProgramId,
     listenersArray,
+    percentageVolatility
 } from './utils';
 import { findProgramAddressSync } from '@project-serum/anchor/dist/cjs/utils/pubkey';
+
+declare var lastFairValue;
 
 const paramsFileName = process.env.PARAMS || 'default.json';
 const params = JSON.parse(
@@ -346,15 +349,11 @@ async function fullMarketMaker() {
             const selfConnection = new Connection(
                 process.env.ENDPOINT_URL || config.cluster_urls[cluster]
             );
-            const perfSamples = await selfConnection.getRecentPerformanceSamples();
-            const data = perfSamples.sort(function (a, b) {
-                return b.slot - a.slot;
-            }).slice(0, 10);
+            const perfSamples = await selfConnection.getRecentPerformanceSamples(3);
             const averageTPS = Math.ceil(
-                data.map((x) => x.numTransactions)
-                    .reduce((a, b) => a + b, 0) / data.length
+                perfSamples.map((x) => x.numTransactions / x.samplePeriodSecs)
+                    .reduce((a, b) => a + b, 0) / 3
             );
-
             mangoAccount = state.mangoAccount;
 
             let j = 0;
@@ -571,6 +570,7 @@ function makeMarketUpdateInstructions(
     // Right now only uses the perp
     const marketIndex = marketContext.marketIndex;
     const market = marketContext.market;
+    const marketName = marketContext.marketName;
     const bids = marketContext.bids;
     const asks = marketContext.asks;
     // const equity = mangoAccount.computeValue(group, cache).toNumber();
@@ -587,6 +587,17 @@ function makeMarketUpdateInstructions(
     }
 
     const fairValue: number = (aggBid + aggAsk) / 2;
+    if (globalThis.lastFairValue === undefined) {
+        globalThis.lastFairValue = [];
+    }
+
+    if (globalThis.lastFairValue[marketName] === undefined) {
+        globalThis.lastFairValue[marketName] = fairValue;
+    }
+
+    const volatility = Math.abs(fairValue - globalThis.lastFairValue[marketName]);
+    const volatilityPercentage = percentageVolatility(fairValue, globalThis.lastFairValue[marketName]);
+
     const aggSpread: number = (aggAsk - aggBid) / fairValue;
     const perpAccount = mangoAccount.perpAccounts[marketIndex];
     // TODO look at event queue as well for unprocessed fills
@@ -594,17 +605,20 @@ function makeMarketUpdateInstructions(
 
     let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
     let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-    if (averageTPS < 20000) {
+    if (averageTPS < 500 || volatilityPercentage > 0.5) {
         bidCharge += 0.005;
         askCharge += 0.005;
-    } else if (averageTPS < 50000) {
+        console.log(`${marketName} - Average TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`);
+    } else if (averageTPS < 1000 || volatilityPercentage > 0.3) {
         bidCharge += 0.003;
         askCharge += 0.003;
-    } else if (averageTPS < 100000) {
+        console.log(`${marketName} - Average TPS: ${averageTPS} < 1000 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.3`);
+    } else if (averageTPS < 1500 || volatilityPercentage > 0.2) {
         bidCharge += 0.001;
         askCharge += 0.001;
+        console.log(`${marketName} - Average TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`);
     }
-
+    globalThis.lastFairValue[marketName] = fairValue;
     const requoteThresh = marketContext.params.requoteThresh;
     const size = quoteSize / fairValue;
     const bidPrice = fairValue * (1 - bidCharge);
@@ -796,13 +810,13 @@ async function onExit(
         );
         tx.add(cancelAllInstr);
         if (tx.instructions.length === params.batch) {
-            txProms.push(client.sendTransaction(tx, payer, []));
+            // txProms.push(client.sendTransaction(tx, payer, []));
             tx = new Transaction();
         }
     }
 
     if (tx.instructions.length) {
-        txProms.push(client.sendTransaction(tx, payer, []));
+        // txProms.push(client.sendTransaction(tx, payer, []));
     }
     const txids = await Promise.all(txProms);
     txids.forEach((txid) => {
