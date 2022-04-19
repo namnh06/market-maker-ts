@@ -25,8 +25,6 @@ import {
     PerpMarketConfig,
     sleep,
     zeroKey,
-    RootBank,
-    QUOTE_INDEX
 } from '@blockworks-foundation/mango-client';
 import { OpenOrders } from '@project-serum/serum';
 import path from 'path';
@@ -250,34 +248,6 @@ async function fullScan() {
             );
             mangoAccount = state.mangoAccount;
             let message: string = "";
-            const perpMarkets = await Promise.all(
-                Object.keys(params.assets).map((baseSymbol) => {
-                    const perpMarketConfig = getPerpMarketByBaseSymbol(
-                        groupIds,
-                        baseSymbol,
-                    ) as PerpMarketConfig;
-
-                    return client.getPerpMarket(
-                        perpMarketConfig.publicKey,
-                        perpMarketConfig.baseDecimals,
-                        perpMarketConfig.quoteDecimals,
-                    );
-                }),
-            );
-            let rootBanks: (RootBank | undefined)[];
-            rootBanks = await mangoGroup.loadRootBanks(connection);
-            const quoteRootBank = rootBanks[QUOTE_INDEX];
-            if (quoteRootBank) {
-                console.log(`Setting Positive Profit and Loss ...`);
-                await client.settlePosPnl(
-                    mangoGroup,
-                    state.cache,
-                    mangoAccount,
-                    perpMarkets,
-                    quoteRootBank,
-                    payer,
-                );
-            }
             if (params.isFull === true) {
                 message += "\n" + `--- SCAN FULL ---`;
                 for (let i = 0; i < marketContexts.length; i++) {
