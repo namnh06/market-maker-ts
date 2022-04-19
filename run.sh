@@ -19,6 +19,9 @@ then
 elif [ $1 == "--wick" ]
 then
     yarn wick
+elif [ $1 == "--ioc" ]
+then
+    yarn wick
 else
     yarn mm
 fi

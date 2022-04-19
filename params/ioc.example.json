@@ -1,0 +1,152 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 2000,
+    "batch": 6,
+    "assets": {
+        "BTC": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.06,
+                "askCharge": 0.06,
+                "bidWashCharge": 0.003,
+                "askWashCharge": 0.003,
+                "ftxSize": 100000
+            }
+        },
+        "ETH": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.006,
+                "askCharge": 0.006,
+                "bidWashCharge": 0.003,
+                "askWashCharge": 0.003,
+                "ftxSize": 100000
+            }
+        },
+        "SOL": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.006,
+                "askCharge": 0.006,
+                "bidWashCharge": 0.003,
+                "askWashCharge": 0.003,
+                "ftxSize": 100000
+            }
+        },
+        "LUNA": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.006,
+                "askCharge": 0.006,
+                "bidWashCharge": 0.005,
+                "askWashCharge": 0.005,
+                "ftxSize": 100000
+            }
+        },
+        "AVAX": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.006,
+                "askCharge": 0.006,
+                "bidWashCharge": 0.003,
+                "askWashCharge": 0.003,
+                "ftxSize": 100000
+            }
+        },
+        "BNB": {
+            "perp": {
+                "valueAcceptable": 50,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.009,
+                "askCharge": 0.009,
+                "bidWashCharge": 0.005,
+                "askWashCharge": 0.005,
+                "ftxSize": 100000
+            }
+        },
+        "ADA": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.009,
+                "askCharge": 0.009,
+                "bidWashCharge": 0.005,
+                "askWashCharge": 0.005,
+                "ftxSize": 50000
+            }
+        },
+        "FTT": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.009,
+                "askCharge": 0.009,
+                "bidWashCharge": 0.005,
+                "askWashCharge": 0.005,
+                "ftxSize": 20000
+            }
+        },
+        "SRM": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "bidWashCharge": 0.005,
+                "askWashCharge": 0.005,
+                "ftxSize": 10000
+            }
+        },
+        "RAY": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "bidWashCharge": 0.005,
+                "askWashCharge": 0.005,
+                "ftxSize": 10000
+            }
+        },
+        "MNGO": {
+            "perp": {
+                "valueAcceptable": 20,
+                "isTrade": false,
+                "equity": 100,
+                "sizePerc": 1,
+                "bidCharge": 0.015,
+                "askCharge": 0.015,
+                "bidWashCharge": 0.01,
+                "askWashCharge": 0.01,
+                "ftxSize": 5000
+            }
+        }
+    }
+}
