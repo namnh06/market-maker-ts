@@ -42,11 +42,13 @@ import {
     makeInitSequenceInstruction,
     seqEnforcerProgramId,
     listenersArray,
+    percentageVolatility
 } from './utils';
 import { findProgramAddressSync } from '@project-serum/anchor/dist/cjs/utils/pubkey';
 import { Context, Telegraf } from 'telegraf';
 
 declare var lastSendTelegram: number;
+declare var lastFairValue;
 
 // Define your own context type
 interface MyContext extends Context {
@@ -607,21 +609,35 @@ function makeMarketUpdateInstructions(
     if (aggBid === undefined || aggAsk === undefined) {
         return [];
     }
-    const fairValue = (aggBid + aggAsk) / 2;
+    const fairValue: number = (aggBid + aggAsk) / 2;
+    if (globalThis.lastFairValue === undefined) {
+        globalThis.lastFairValue = [];
+    }
+
+    if (globalThis.lastFairValue[marketName] === undefined) {
+        globalThis.lastFairValue[marketName] = fairValue;
+    }
+
+    const volatility = Math.abs(fairValue - globalThis.lastFairValue[marketName]);
+    const volatilityPercentage = percentageVolatility(fairValue, globalThis.lastFairValue[marketName]);
     const aggSpread: number = (aggAsk - aggBid) / fairValue;
 
     let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
     let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-    if (averageTPS < 500) {
-        bidCharge += 0.002;
-        askCharge += 0.002;
-    } else if (averageTPS < 1000) {
+    if (averageTPS < 500 || volatilityPercentage > 0.5) {
+        bidCharge += 0.003;
+        askCharge += 0.003;
+        message += `n${marketName} - Average TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`;
+    } else if (averageTPS < 1000 || volatilityPercentage > 0.3) {
         bidCharge += 0.001;
         askCharge += 0.001;
-    } else if (averageTPS < 1500) {
+        message += `\n${marketName} - Average TPS: ${averageTPS} < 1000 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.3`;
+    } else if (averageTPS < 1500 || volatilityPercentage > 0.2) {
         bidCharge += 0.0005;
         askCharge += 0.0005;
+        message += `\n${marketName} - Average TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`;
     }
+    globalThis.lastFairValue[marketName] = fairValue;
     const bidPrice = fairValue * (1 - bidCharge);
     const askPrice = fairValue * (1 + askCharge);
 
