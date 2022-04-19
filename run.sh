@@ -21,7 +21,7 @@ then
     yarn wick
 elif [ $1 == "--ioc" ]
 then
-    yarn wick
+    yarn ioc
 else
     yarn mm
 fi
