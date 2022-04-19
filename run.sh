@@ -4,6 +4,9 @@
 if [ $1 == "--cancel" ]
 then
     yarn cancel
+elif [ $1 == "--cancel-immediately" ]
+then
+    yarn cancel-immediately
 elif [ $1 == "--wash" ]
 then
     yarn wash
