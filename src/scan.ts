@@ -43,7 +43,7 @@ interface MyContext extends Context {
     myOtherProp?: number
 }
 
-const paramsFileName = process.env.PARAMS || 'default.json';
+const paramsFileName = process.env.PARAMS ?? 'default.json';
 const params = JSON.parse(
     fs.readFileSync(
         path.resolve(__dirname, `../params/${paramsFileName}`),
@@ -54,7 +54,7 @@ const params = JSON.parse(
 const payer = new Account(
     JSON.parse(
         fs.readFileSync(
-            process.env.KEYPAIR || os.homedir() + '/.config/solana/id.json',
+            process.env.KEYPAIR ?? os.homedir() + '/.config/solana/id.json',
             'utf-8',
         ),
     ),
@@ -62,18 +62,17 @@ const payer = new Account(
 
 const config = new Config(IDS);
 
-const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN || '';
-const telegramChannelId = process.env.TELEGRAM_CHANNEL_ID || '';
+const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN ?? '';
+const telegramChannelId = process.env.TELEGRAM_CHANNEL_ID ?? '';
+const { group, interval, mangoAccountName, mangoAccountPubkey, assets } = params;
 
-const groupIds = config.getGroupWithName(params.group) as GroupConfig;
-if (!groupIds) {
-    throw new Error(`Group ${params.group} not found`);
-}
+const groupIds = config.getGroupWithName(group) as GroupConfig;
+if (!groupIds) throw new Error(`Group ${group} not found`);
+
 const cluster = groupIds.cluster as Cluster;
-const mangoProgramId = groupIds.mangoProgramId;
-const mangoGroupKey = groupIds.publicKey;
+const { mangoProgramId, publicKey: mangoGroupKey } = groupIds;
 
-const control = { isRunning: true, interval: params.interval };
+const control = { isRunning: true, interval: interval };
 
 type MarketContext = {
     marketName: string;
@@ -98,13 +97,16 @@ async function loadAccountAndMarketState(
     mangoAccount: MangoAccount;
     marketContexts: MarketContext[];
 }> {
+    const { mangoCache, dexProgramId } = group;
+    const { publicKey: oldMangoAccountPublicKey } = oldMangoAccount;
+
     const inBasketOpenOrders = oldMangoAccount
         .getOpenOrdersKeysInBasket()
         .filter((pk) => !pk.equals(zeroKey));
 
     const allAccounts = [
-        group.mangoCache,
-        oldMangoAccount.publicKey,
+        mangoCache,
+        oldMangoAccountPublicKey,
         ...inBasketOpenOrders,
         ...marketContexts.map((marketContext) => marketContext.market.bids),
         ...marketContexts.map((marketContext) => marketContext.market.asks),
@@ -123,15 +125,15 @@ async function loadAccountAndMarketState(
     );
     const openOrdersAis = accountInfos.slice(2, 2 + inBasketOpenOrders.length);
     for (let i = 0; i < openOrdersAis.length; i++) {
-        const ai = openOrdersAis[i];
+        const { publicKey, accountInfo } = openOrdersAis[i];
         const marketIndex = mangoAccount.spotOpenOrders.findIndex((soo) =>
-            soo.equals(ai.publicKey),
+            soo.equals(publicKey),
         );
         mangoAccount.spotOpenOrdersAccounts[marketIndex] =
             OpenOrders.fromAccountInfo(
-                ai.publicKey,
-                ai.accountInfo,
-                group.dexProgramId,
+                publicKey,
+                accountInfo,
+                dexProgramId,
             );
     }
 
@@ -170,7 +172,7 @@ async function loadAccountAndMarketState(
 async function fullScan() {
     console.log(`--- BEGIN FULL SCAN ---`);
     const connection = new Connection(
-        process.env.ENDPOINT_URL || config.cluster_urls[cluster],
+        process.env.ENDPOINT_URL ?? config.cluster_urls[cluster],
         'processed' as Commitment,
     );
     const client = new MangoClient(connection, mangoProgramId);
@@ -178,46 +180,48 @@ async function fullScan() {
     // load group
     const mangoGroup = await client.getMangoGroup(mangoGroupKey);
 
+    if (!mangoAccountName || !mangoAccountPubkey)
+        throw new Error('Please add mangoAccountName or mangoAccountPubkey to params file');
+
     // load mangoAccount
-    let mangoAccount: MangoAccount;
-    if (params.mangoAccountName) {
-        mangoAccount = await loadMangoAccountWithName(
-            client,
-            mangoGroup,
-            payer,
-            params.mangoAccountName,
-        );
-    } else if (params.mangoAccountPubkey) {
+    let mangoAccount = await loadMangoAccountWithName(
+      client,
+      mangoGroup,
+      payer,
+      mangoAccountName,
+    );
+
+    if (mangoAccountPubkey)
         mangoAccount = await loadMangoAccountWithPubkey(
-            client,
-            mangoGroup,
-            payer,
-            new PublicKey(params.mangoAccountPubkey),
+          client,
+          mangoGroup,
+          payer,
+          new PublicKey(mangoAccountPubkey),
         );
-    } else {
-        throw new Error(
-            'Please add mangoAccountName or mangoAccountPubkey to params file',
-        );
-    }
+
     const bot = new Telegraf<MyContext>(telegramBotToken);
 
     const marketContexts: MarketContext[] = [];
-    for (const baseSymbol in params.assets) {
+
+    for (const baseSymbol in assets) {
         const perpMarketConfig = getPerpMarketByBaseSymbol(
             groupIds,
             baseSymbol,
         ) as PerpMarketConfig;
+
+        const { publicKey, baseDecimals, quoteDecimals, name, marketIndex } = perpMarketConfig
+
         const perpMarket = await client.getPerpMarket(
-            perpMarketConfig.publicKey,
-            perpMarketConfig.baseDecimals,
-            perpMarketConfig.quoteDecimals,
+            publicKey,
+            baseDecimals,
+            quoteDecimals,
         );
         marketContexts.push({
-            marketName: perpMarketConfig.name,
-            params: params.assets[baseSymbol].perp,
+            marketName: name,
+            params: assets[baseSymbol].perp,
             config: perpMarketConfig,
             market: perpMarket,
-            marketIndex: perpMarketConfig.marketIndex,
+            marketIndex: marketIndex,
             bids: await perpMarket.loadBids(connection),
             asks: await perpMarket.loadAsks(connection),
         });
@@ -233,10 +237,10 @@ async function fullScan() {
     while (control.isRunning) {
         console.log(`---BEGIN---`);
         const selfConnection = new Connection(
-            process.env.ENDPOINT_URL || config.cluster_urls[cluster]
+            process.env.ENDPOINT_URL ?? config.cluster_urls[cluster]
         );
         const perfSamples = await selfConnection.getRecentPerformanceSamples();
-        const data = perfSamples.sort(function (a, b) {
+        const data = perfSamples.sort( (a, b) => {
             return b.slot - a.slot;
         }).slice(0, 10);
         const averageTPS = Math.ceil(
@@ -245,43 +249,39 @@ async function fullScan() {
         );
 
         try {
-            const state = await loadAccountAndMarketState(
+            const { mangoAccount: stateMangoAccount, cache: stateCache } = await loadAccountAndMarketState(
                 connection,
                 mangoGroup,
                 mangoAccount,
                 marketContexts,
             );
-            mangoAccount = state.mangoAccount;
+            mangoAccount = stateMangoAccount;
             let message: string = "";
             if (params.isFull === true) {
                 message += "\n" + `--- SCAN FULL ---`;
                 for (let i = 0; i < marketContexts.length; i++) {
-                    const isScan = marketContexts[i].params.isScan === true ? true : false;
+                    const isScan = marketContexts[i].params.isScan === true;
                     if (isScan) {
                         const marketMessage = scanFull(
                             mangoGroup,
-                            state.cache,
+                            stateCache,
                             mangoAccount,
                             marketContexts[i],
                             bot,
                             message
                         );
-                        if (marketMessage !== "") {
-                            message += "\n" + marketMessage;
-                        }
+                        if (marketMessage !== "")  message += "\n" + marketMessage;
                     }
                 }
                 message += "\n" + "---";
                 message += "\n" + `Current Average TPS: ${averageTPS.toLocaleString()}`;
-                const fairValue = mangoGroup.getPrice(0, state.cache).toNumber();
-                const liquidityMiningReward = mangoAccount.mgnoAccruedValue(mangoGroup, state.cache).toNumber();
+                const fairValue = mangoGroup.getPrice(0, stateCache).toNumber();
+                const liquidityMiningReward = mangoAccount.mgnoAccruedValue(mangoGroup, stateCache).toNumber();
                 message += "\n" + `MNGO Price: ${fairValue.toFixed(4)} - MNGO rewards: ${(liquidityMiningReward / fairValue).toFixed(2)} - $${liquidityMiningReward.toFixed(2)}`;
                 message += "\n" + "---";
             }
 
-            if (params.isIOC === true) {
-                message += "\n" + `--- IMEDIATELY OR CANCEL ---`;
-            }
+            if (params.isIOC === true) message += "\n" + `--- IMEDIATELY OR CANCEL ---`;
 
             if (params.isNeutral === true) {
                 message += "\n" + `--- DELTA NEUTRAL ---`;
@@ -289,24 +289,20 @@ async function fullScan() {
                     if (marketContexts[i].params.isNeutral) {
                         const marketMessage = scanNeutral(
                             mangoGroup,
-                            state.cache,
+                            stateCache,
                             mangoAccount,
                             marketContexts[i],
                             bot,
                             message
                         );
-                        if (marketMessage !== "") {
-                            message += "\n" + marketMessage;
-                        }
+                        if (marketMessage !== "")  message += "\n" + marketMessage;
                     }
                 }
                 message += "\n" + "---";
             }
 
-            const accountEquity: number = mangoAccount.getEquityUi(mangoGroup, state.cache) * 1000000;
-            if (globalThis.lastAccountEquity === undefined) {
-                globalThis.lastAccountEquity = accountEquity;
-            }
+            const accountEquity: number = mangoAccount.getEquityUi(mangoGroup, stateCache) * 1000000;
+            if (globalThis.lastAccountEquity === undefined) globalThis.lastAccountEquity = accountEquity;
             message += "\n" + `Last Account Equity: $${globalThis.lastAccountEquity.toLocaleString()}`;
             message += "\n" + `Current Account Equity: $${accountEquity.toLocaleString()}`;
             message += "\n" + `Difference In Account Equity: $${(accountEquity - globalThis.lastAccountEquity).toLocaleString()}`;
@@ -314,7 +310,7 @@ async function fullScan() {
             const quote = require('inspirational-quotes');
             message += "\n" + quote.getRandomQuote();
             console.log(message);
-            bot.telegram.sendMessage(telegramChannelId, message);
+            await bot.telegram.sendMessage(telegramChannelId, message);
             globalThis.lastAccountEquity = accountEquity;
         } catch (e) {
             console.log(e);
@@ -338,40 +334,29 @@ function scanFull(
 ): string {
     let marketMessage: string = "";
     // Right now only uses the perp
-    const marketIndex = marketContext.marketIndex;
-    const market = marketContext.market;
+    const { marketIndex, market, params, bids, asks } = marketContext;
+    const { liquidityMiningInfo,  priceLotsToUiConvertor, baseLotsToUiConvertor } = market;
 
     // TODO look at event queue as well for unprocessed fills
-    const mngoPerPeriod = market.liquidityMiningInfo.mngoPerPeriod.toNumber();
+    const mngoPerPeriod = liquidityMiningInfo.mngoPerPeriod.toNumber();
     if (mngoPerPeriod > 0) {
         const fairValue = group.getPrice(marketIndex, cache).toNumber();
-
-        const priceLotsToUiConvertor = market.priceLotsToUiConvertor;
         const priceLotsDecimals = priceLotsToUiConvertor.toString().length - (priceLotsToUiConvertor.toString().indexOf('.') + 1);
-
-        const baseLotsToUiConvertor = market.baseLotsToUiConvertor;
         const baseLotsDecimals = baseLotsToUiConvertor.toString().length - (baseLotsToUiConvertor.toString().indexOf('.') + 1);
-        const maxDepth = market.liquidityMiningInfo.maxDepthBps.toNumber() * baseLotsToUiConvertor;
-        const maxDepthMax: number = marketContext.params.maxDepthMax || 0.6;
+        const maxDepth = liquidityMiningInfo.maxDepthBps.toNumber() * baseLotsToUiConvertor;
+        const maxDepthMax: number = params.maxDepthMax || 0.6;
         const maxDepthAcceptable = maxDepth * maxDepthMax;
-        const priceRange: number = marketContext.params.priceRange || 0.05;
-        const bids = marketContext.bids;
+        const priceRange: number = params.priceRange || 0.05;
         const bidPriceRange: number = fairValue * (1 - priceRange);
         let cumulativeBid: number = 0;
         for (const bid of bids) {
-            if (bid.price <= bidPriceRange) {
-                break;
-            }
+            if (bid.price <= bidPriceRange) break;
             cumulativeBid += bid.size;
         }
-
-        const asks = marketContext.asks;
         const askPriceRange: number = fairValue * (1 + priceRange);
         let cumulativeAsk: number = 0;
         for (const ask of asks) {
-            if (ask.price >= askPriceRange) {
-                break;
-            }
+            if (ask.price >= askPriceRange) break;
             cumulativeAsk += ask.size;
         }
 
@@ -402,21 +387,18 @@ function scanNeutral(
 ): string {
     let marketMessage: string = "";
     // Right now only uses the perp
-    const marketIndex = marketContext.marketIndex;
-    const market = marketContext.market;
+    const { marketIndex, market, bids, asks } = marketContext;
 
     // TODO look at event queue as well for unprocessed fills
     marketMessage += `---` + "\n" + `${marketContext.marketName}`;
-    const currentFundingRate = market.getCurrentFundingRate(group, cache, marketIndex, marketContext.bids, marketContext.asks);
+    const currentFundingRate = market.getCurrentFundingRate(group, cache, marketIndex, bids, asks);
     marketMessage += "\n" + `1 hour funding rate: ${(currentFundingRate * 100).toFixed(4)}%`;
     marketMessage += "\n" + `APR funding rate: ${(currentFundingRate * 100 * 24 * 365).toFixed(2)}%`;
     return marketMessage;
 }
 
 function startScan() {
-    if (control.isRunning) {
-        fullScan().finally(startScan);
-    }
+    if (control.isRunning) fullScan().finally(startScan);
 }
 
 async function onExit(

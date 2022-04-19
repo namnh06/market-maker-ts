@@ -32,14 +32,14 @@ const mangoGroupKey = groupIds.publicKey;
 
 async function scratch() {
   const connection = new Connection(
-    process.env.ENDPOINT_URL || config.cluster_urls[cluster],
+    process.env.ENDPOINT_URL ?? config.cluster_urls[cluster],
     'processed' as Commitment,
   );
 
   const payer = new Account(
     JSON.parse(
       readFileSync(
-        process.env.KEYPAIR || os.homedir() + '/.config/solana/devnet.json',
+        process.env.KEYPAIR ?? os.homedir() + '/.config/solana/devnet.json',
         'utf-8',
       ),
     ),
@@ -50,31 +50,38 @@ async function scratch() {
   const mangoAccountPubkey = new PublicKey(
     '22JS1jkvkLcdxhHo1LpWXUh6sTErkt54j1YaszYWZoCi',
   );
-  const mangoAccount = await client.getMangoAccount(
-    mangoAccountPubkey,
-    groupIds.serumProgramId,
-  );
-  const rootBanks = await group.loadRootBanks(connection);
-  const quoteRootBank = rootBanks[QUOTE_INDEX] as RootBank;
-  const quoteNodeBank = quoteRootBank.nodeBankAccounts[0];
 
-  const tokenAccount = await findLargestTokenAccountForOwner(
-    connection,
-    payer.publicKey,
-    group.tokens[QUOTE_INDEX].mint,
-  );
+  // Performs parallel request
+  const [mangoAccount, rootBanks, tokenAccount] = await Promise.all([
+    client.getMangoAccount(
+      mangoAccountPubkey,
+      groupIds.serumProgramId,
+    ),
+    group.loadRootBanks(connection),
+    findLargestTokenAccountForOwner(
+      connection,
+      payer.publicKey,
+      group.tokens[QUOTE_INDEX].mint,
+    )
+  ]);
+
+  const { publicKey: quoteRootBankPublicKey, nodeBankAccounts  } = rootBanks[QUOTE_INDEX] as RootBank;
+  const { publicKey: quoteNodeBankPublicKey, vault } = nodeBankAccounts[0];
+  const { publicKey: groupPublicKey, mangoCache, signerKey } = group;
+  const { publicKey: mangoAccountPublicKey, spotOpenOrders } = mangoAccount;
+
   const instr = makeWithdrawInstruction(
     client.programId,
-    group.publicKey,
-    mangoAccount.publicKey,
+    groupPublicKey,
+    mangoAccountPublicKey,
     payer.publicKey,
-    group.mangoCache,
-    quoteRootBank.publicKey,
-    quoteNodeBank.publicKey,
-    quoteNodeBank.vault,
+    mangoCache,
+    quoteRootBankPublicKey,
+    quoteNodeBankPublicKey,
+    vault,
     tokenAccount.publicKey,
-    group.signerKey,
-    mangoAccount.spotOpenOrders,
+    signerKey,
+    spotOpenOrders,
     new BN('100'),
     true,
   );
@@ -84,4 +91,7 @@ async function scratch() {
   console.log(txid.toString());
 }
 
-scratch();
+// Immediately invoked scratch function expression
+(async () => {
+  await scratch();
+})();

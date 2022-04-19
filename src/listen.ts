@@ -200,5 +200,8 @@ const books: MultiBook[] = marketNames.map((mn) => {
     };
 });
 
-listenFtxBooks(books);
-listenBinanceBooks(books);
+// Immediately invoked these function expression
+(async () => {
+  await listenFtxBooks(books);
+  await listenBinanceBooks(books);
+})();
