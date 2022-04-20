@@ -354,20 +354,6 @@ async function fullMarketMaker() {
     while (control.isRunning) {
         try {
             mangoAccount = state.mangoAccount;
-
-            // Calculate portfolio level values
-            let pfQuoteValue: number | undefined = 0;
-            for (const mc of marketContexts) {
-                const pos = mangoAccount.getPerpPositionUi(mc.marketIndex, mc.market);
-                const mid = mc.ftxMid; // TODO combine with other book
-                if (mid) {
-                    pfQuoteValue += pos * mid;
-                } else {
-                    pfQuoteValue = undefined;
-                    break;
-                }
-            }
-            if (pfQuoteValue === undefined) continue; // don't proceed if we don't have pfQuoteValue yet
             let j = 0;
             let tx = new Transaction();
             for (let i = 0; i < marketContexts.length; i++) {
@@ -378,7 +364,6 @@ async function fullMarketMaker() {
                         state.cache,
                         mangoAccount,
                         marketContexts[i],
-                        pfQuoteValue,
                         telegramBot
                     );
 
@@ -390,6 +375,7 @@ async function fullMarketMaker() {
                             // client.sendTransaction(tx, payer, [], null);
                             tx = new Transaction();
                             j = 0;
+                            break;
                         }
                     }
                 }
@@ -578,7 +564,6 @@ function makeMarketUpdateInstructions(
     cache: MangoCache,
     mangoAccount: MangoAccount,
     marketContext: MarketContext,
-    pfQuoteValue: number,
     telegramBot
 ): TransactionInstruction[] {
     // Right now only uses the perp
@@ -642,7 +627,7 @@ function makeMarketUpdateInstructions(
 
     const valueAcceptable = marketContext.params.valueAcceptable || 50;
     let message: string = '';
-    message += `--- ${marketContext.marketName} ---`;
+    message += `--- [IOC] ${marketContext.marketName} ---`;
     message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)} - size: ${size.toFixed(baseLotsDecimals)} - `
         + `aggBid: ${aggBid.toFixed(priceLotsDecimals)} - aggAsk: ${aggAsk.toFixed(priceLotsDecimals)}`;
     message += `\nbidPriceAcceptable: ${bidPriceAcceptable.toFixed(priceLotsDecimals)} - bidWashPrice: ${bidWashPrice.toFixed(priceLotsDecimals)} - `
