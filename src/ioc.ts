@@ -687,9 +687,9 @@ function makeMarketUpdateInstructions(
             message += `\nNo sell due to basePos: ${basePos} > size: ${size}`;
         }
         if (globalThis.lastSendTelegram === undefined) {
+            telegramBot.telegram.sendMessage(telegramChannelId, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
-        }
-        if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
+        } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
             telegramBot.telegram.sendMessage(telegramChannelId, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
         }
@@ -746,9 +746,9 @@ function makeMarketUpdateInstructions(
             message += `\nNo sell due to basePos: ${basePos} > size: ${size}`;
         }
         if (globalThis.lastSendTelegram === undefined) {
+            telegramBot.telegram.sendMessage(telegramChannelId, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
-        }
-        if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
+        } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
             telegramBot.telegram.sendMessage(telegramChannelId, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
         }

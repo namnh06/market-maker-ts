@@ -33,6 +33,7 @@ import {
     loadMangoAccountWithPubkey
 } from './utils';
 import { Context, Telegraf } from 'telegraf'
+declare var lastSendTelegram: number;
 
 // Define your own context type
 interface MyContext extends Context {
@@ -253,7 +254,14 @@ async function fullCheckHit() {
             if (check) {
                 message += `\nAccount: ${mangoAccount.name} - ${mangoAccount.publicKey.toString()}`;
                 console.log(message);
-                bot.telegram.sendMessage(telegramChannelId, message);
+                if (globalThis.lastSendTelegram === undefined) {
+                    bot.telegram.sendMessage(telegramChannelId, message);
+                    globalThis.lastSendTelegram = Date.now() / 1000;
+                } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
+                    bot.telegram.sendMessage(telegramChannelId, message);
+                    globalThis.lastSendTelegram = Date.now() / 1000;
+                }
+
             }
         } catch (e) {
             console.log(e);
