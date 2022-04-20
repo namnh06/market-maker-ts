@@ -593,7 +593,7 @@ function makeMarketUpdateInstructions(
 
         const forceTrade = marketContext.params.forceTrade || false;
         // Start check bid and ask
-        message += `\nAccount: ${mangoAccount.name} - ${mangoAccount.owner}`
+        message += `\nAccount: ${mangoAccount.name} - ${mangoAccount.publicKey.toString()}`
         if (
             basePos > 0 &&
             bestBid !== undefined &&
@@ -633,8 +633,9 @@ function makeMarketUpdateInstructions(
                     'ioc',
                     true
                 );
-                message += `\nSelling ..., base position: ${basePos}`;
+                message += `\nSelling ...`;
                 message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bestBid.price} `;
+                message += `\nCounter party owner ${bestBid.owner.toString()} - size: ${bestBid.size.toFixed(baseLotsDecimals)}`;
                 instructions.push(takerSell);
             } else {
                 message += `\nDo nothing due to the price is not good`;
@@ -642,7 +643,7 @@ function makeMarketUpdateInstructions(
             if (globalThis.lastSendTelegram === undefined) {
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
-            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 10) {
+            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
             }
@@ -685,8 +686,9 @@ function makeMarketUpdateInstructions(
                     'ioc',
                     true
                 );
-                message += `\nBuying ..., base position: ${basePos}`;
+                message += `\nBuying ...`;
                 message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${bestAsk.price} `;
+                message += `\nCounter party owner ${bestAsk.owner.toString()} - size: ${bestAsk.size.toFixed(baseLotsDecimals)}`;
                 instructions.push(takerBuy);
             } else {
                 message += `\nDo nothing due to the price is not good`;
@@ -694,7 +696,7 @@ function makeMarketUpdateInstructions(
             if (globalThis.lastSendTelegram === undefined) {
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
-            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 10) {
+            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
             }
