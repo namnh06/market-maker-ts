@@ -375,6 +375,7 @@ async function fullMarketMaker() {
                             // client.sendTransaction(tx, payer, [], null);
                             tx = new Transaction();
                             j = 0;
+                            console.log('Having a good trade, breaking the loop now');
                             break;
                         }
                     }
@@ -595,11 +596,11 @@ function makeMarketUpdateInstructions(
     // TODO look at event queue as well for unprocessed fills
     const basePos = perpAccount.getBasePositionUi(market);
 
-    const bidCharge = (marketContext.params.bidCharge || 0.05);
-    const askCharge = (marketContext.params.askCharge || 0.05);
+    const bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
+    const askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
 
-    const bidWashCharge = (marketContext.params.bidWashCharge || 0.03);
-    const askWasCharge = (marketContext.params.askWashCharge || 0.03);
+    const bidWashCharge = (marketContext.params.bidWashCharge || 0.03) + aggSpread / 2;
+    const askWasCharge = (marketContext.params.askWashCharge || 0.03) + aggSpread / 2;
 
     const quoteSize = equity * sizePerc;
     let size = quoteSize / fairValue;
@@ -680,6 +681,7 @@ function makeMarketUpdateInstructions(
         message += `\nacceptableAskPrice: ${askPriceAcceptable.toFixed(priceLotsDecimals)} - basePos: ${basePos.toFixed(baseLotsDecimals)} - acceptableSize: ${size.toFixed(baseLotsDecimals)}`;
         if (posAsTradeSizes > -1) {
             message += `\nSelling ...`;
+            console.log(message);
             instructions.push(takerSell);
         } else {
             message += `\nNo sell due to basePos: ${basePos} > size: ${size}`;
@@ -737,7 +739,8 @@ function makeMarketUpdateInstructions(
         message += `\nbestAskPrice: ${bestAsk.price.toFixed(priceLotsDecimals)} - bestAskSize: ${bestAsk.size.toFixed(baseLotsDecimals)} - total: ${(bestAsk.price * bestAsk.size).toFixed(priceLotsDecimals)}`;
         message += `\nacceptableBidPrice: ${bidPriceAcceptable.toFixed(priceLotsDecimals)} - basePos: ${basePos.toFixed(baseLotsDecimals)} - acceptableSize: ${size.toFixed(baseLotsDecimals)}`;
         if (posAsTradeSizes < 1) {
-            message += `\nBuying ...`
+            message += `\nBuying ...`;
+            console.log(message);
             instructions.push(takerBuy);
         } else {
             message += `\nNo sell due to basePos: ${basePos} > size: ${size}`;
