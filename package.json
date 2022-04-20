@@ -15,7 +15,8 @@
     "scan": "ts-node src/scan.ts",
     "check-hit": "ts-node src/check-hit.ts",
     "wick": "ts-node src/wick.ts",
-    "ioc": "ts-node src/ioc.ts"
+    "ioc": "ts-node src/ioc.ts",
+    "check-owner": "ts-node src/check-owner.ts"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",

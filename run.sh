@@ -22,6 +22,9 @@ then
 elif [ $1 == "--ioc" ]
 then
     yarn ioc
+elif [ $1 == "--check-owner" ]
+then
+    yarn check-owner
 else
     yarn mm
 fi

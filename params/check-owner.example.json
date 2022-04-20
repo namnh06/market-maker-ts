@@ -1,0 +1,64 @@
+{
+  "group": "mainnet.1",
+  "mangoAccountName": "",
+  "mangoAccountPubkey": "",
+  "interval": 5000,
+  "batch": 1,
+  "assets": {
+    "BTC": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "SOL": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "ETH": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "LUNA": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "AVAX": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "BNB": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "ADA": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "MNGO": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "RAY": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "SRM": {
+      "perp": {
+        "isCheck": false
+      }
+    },
+    "FTT": {
+      "perp": {
+        "isCheck": false
+      }
+    }
+  }
+}
