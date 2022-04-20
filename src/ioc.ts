@@ -689,7 +689,7 @@ function makeMarketUpdateInstructions(
         if (globalThis.lastSendTelegram === undefined) {
             globalThis.lastSendTelegram = Date.now() / 1000;
         }
-        if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 10 || globalThis.lastSendTelegram === undefined) {
+        if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
             telegramBot.telegram.sendMessage(telegramChannelId, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
         }
@@ -748,7 +748,7 @@ function makeMarketUpdateInstructions(
         if (globalThis.lastSendTelegram === undefined) {
             globalThis.lastSendTelegram = Date.now() / 1000;
         }
-        if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 10 || globalThis.lastSendTelegram === undefined) {
+        if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
             telegramBot.telegram.sendMessage(telegramChannelId, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
         }
