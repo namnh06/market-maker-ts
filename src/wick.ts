@@ -761,13 +761,13 @@ function makeMarketUpdateInstructions(
             instructions.push(placeAskInstr);
         }
         console.log(
-            `Current TPS: ${averageTPS} - ${marketContext.marketName} 
-            Requoting sentBidPx: ${marketContext.sentBidPrice} 
-            newBidPx: ${bookAdjBid} 
-            sentAskPx: ${marketContext.sentAskPrice} 
-            newAskPx: ${bookAdjAsk} 
-            aggBid: ${aggBid} 
-            addAsk: ${aggAsk}`,
+            `Current TPS: ${averageTPS} - ${marketContext.marketName} - `,
+            `Requoting sentBidPx: ${marketContext.sentBidPrice} - `,
+            `newBidPx: ${bookAdjBid} - `,
+            `sentAskPx: ${marketContext.sentAskPrice} - `,
+            `newAskPx: ${bookAdjAsk} - `,
+            `aggBid: ${aggBid} - `,
+            `addAsk: ${aggAsk}`
         );
         marketContext.sentBidPrice = bookAdjBid.toNumber();
         marketContext.sentAskPrice = bookAdjAsk.toNumber();
