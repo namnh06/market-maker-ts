@@ -25,6 +25,9 @@ then
 elif [ $1 == "--check-owner" ]
 then
     yarn check-owner
+elif [ $1 == "--delta-neutral" ]
+then
+    yarn delta-neutral
 else
     yarn mm
 fi

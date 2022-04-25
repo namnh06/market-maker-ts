@@ -16,7 +16,8 @@
     "check-hit": "ts-node src/check-hit.ts",
     "wick": "ts-node src/wick.ts",
     "ioc": "ts-node src/ioc.ts",
-    "check-owner": "ts-node src/check-owner.ts"
+    "check-owner": "ts-node src/check-owner.ts",
+    "delta-neultra": "ts-node src/delta-neultra.ts"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
