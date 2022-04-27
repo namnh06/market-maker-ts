@@ -588,7 +588,7 @@ function makeMarketUpdateInstructions(
 ): TransactionInstruction[] {
     let message: string = '---';
     message += `\nCurrent TPS: ${averageTPS}`;
-    message += `\n---`;
+    message += `\n--- ${process.env.SERVER_IP || "No IP"} ---`;
     // Right now only uses the perp
     const marketIndex = marketContext.marketIndex;
     const market = marketContext.market;
