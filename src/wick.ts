@@ -621,9 +621,16 @@ function makeMarketUpdateInstructions(
     globalThis.lastFairValue[marketName] = fairValue;
     const requoteThresh = marketContext.params.requoteThresh;
     const size = quoteSize / fairValue;
-    const bidPrice = fairValue * (1 - bidCharge);
-    const askPrice = fairValue * (1 + askCharge);
-    // TODO volatility adjustment
+    let bidPrice = fairValue * (1 - bidCharge);
+    let askPrice = fairValue * (1 + askCharge);
+
+    // Re-calculate Order Price if too volatility
+    if (bidPrice > aggBid) {
+        bidPrice = aggBid * (1 - bidCharge);
+    }
+    if (askPrice < aggAsk) {
+        askPrice = aggAsk * (1 + askCharge);
+    }
 
     let bidSize = size;
     let askSize = size;
@@ -766,7 +773,7 @@ function makeMarketUpdateInstructions(
             `newBidPx: ${bookAdjBid}`,
             `sentAskPx: ${marketContext.sentAskPrice}`,
             `newAskPx: ${bookAdjAsk}`,
-            `aggBid: ${aggBid} `,
+            `aggBid: ${aggBid}`,
             `addAsk: ${aggAsk}`
         );
         marketContext.sentBidPrice = bookAdjBid.toNumber();

@@ -638,8 +638,16 @@ function makeMarketUpdateInstructions(
         message += `\n${marketName} - Average TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`;
     }
     globalThis.lastFairValue[marketName] = fairValue;
-    const bidPrice = fairValue * (1 - bidCharge);
-    const askPrice = fairValue * (1 + askCharge);
+    let bidPrice = fairValue * (1 - bidCharge);
+    let askPrice = fairValue * (1 + askCharge);
+
+    // Re-calculate Order Price if too volatility
+    if (bidPrice > aggBid) {
+        bidPrice = aggBid * (1 - bidCharge);
+    }
+    if (askPrice < aggAsk) {
+        askPrice = aggAsk * (1 + askCharge);
+    }
 
     // Start building the transaction
     const instructions: TransactionInstruction[] = [
