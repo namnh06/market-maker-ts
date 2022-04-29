@@ -627,15 +627,15 @@ function makeMarketUpdateInstructions(
     if (averageTPS < 500 || volatilityPercentage > 0.5) {
         bidCharge += 0.003;
         askCharge += 0.003;
-        message += `n${marketName} - Average TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`;
+        message += `\nAverage TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`;
     } else if (averageTPS < 1000 || volatilityPercentage > 0.3) {
         bidCharge += 0.001;
         askCharge += 0.001;
-        message += `\n${marketName} - Average TPS: ${averageTPS} < 1000 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.3`;
+        message += `\nAverage TPS: ${averageTPS} < 1000 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.3`;
     } else if (averageTPS < 1500 || volatilityPercentage > 0.2) {
         bidCharge += 0.0005;
         askCharge += 0.0005;
-        message += `\n${marketName} - Average TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`;
+        message += `\nAverage TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`;
     }
     globalThis.lastFairValue[marketName] = fairValue;
     let bidPrice = fairValue * (1 - bidCharge);
@@ -777,7 +777,7 @@ function makeMarketUpdateInstructions(
         if (globalThis.lastSendTelegram === undefined) {
             bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
-        } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 10) {
+        } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 15) {
             bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
             globalThis.lastSendTelegram = Date.now() / 1000;
         }
