@@ -277,7 +277,7 @@ function checkOwner(
         if (bidCount > 50) {
             break;
         }
-        if (bid.size > 1.2) {
+        if (bid.size > 7) {
             console.log(`owner: ${bid.owner} - size: ${bid.size} - price: ${bid.price}`);
         }
     }
