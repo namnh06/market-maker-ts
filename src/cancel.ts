@@ -701,13 +701,13 @@ function makeMarketUpdateInstructions(
                             cumulativeToBidPrice += b.size;
                         }
                         message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
-                        if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
+                        // if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
                             message += `\nHas room to cancel.`;
                             instructions.push(cancelAllInstr);
-                        } else {
-                            message += `\nNo room to cancel.`;
-                            console.log(message);
-                        }
+                        // } else {
+                        //     message += `\nNo room to cancel.`;
+                        //     console.log(message);
+                        // }
                     } else {
                         instructions.push(cancelAllInstr);
                     }
