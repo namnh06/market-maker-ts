@@ -586,6 +586,7 @@ function makeMarketUpdateInstructions(
     bot,
 
 ): TransactionInstruction[] {
+
     let message: string = '---';
     message += `\nCurrent TPS: ${averageTPS}`;
     message += `\n--- ${process.env.SERVER_IP || "No IP"} ---`;
@@ -594,195 +595,224 @@ function makeMarketUpdateInstructions(
     const market = marketContext.market;
     const marketName = marketContext.marketName;
     message += `\n${marketName}`;
+    const openOrders = mangoAccount
+    .getPerpOpenOrders()
+    .filter((o) => o.marketIndex === marketIndex);
+    if(openOrders.length > 0) { 
+        const instructions: TransactionInstruction[] = [
+            makeCheckAndSetSequenceNumberInstruction(
+                marketContext.sequenceAccount,
+                payer.publicKey,
+                Math.round(getUnixTs() * 1000),
+            ),
+        ];
 
-    const priceLotsToUiConvertor = market.priceLotsToUiConvertor;
-    const priceLotsDecimals = priceLotsToUiConvertor.toString().length - (priceLotsToUiConvertor.toString().indexOf('.') + 1);
-
-    const baseLotsToUiConvertor = market.baseLotsToUiConvertor;
-    const baseLotsDecimals = baseLotsToUiConvertor.toString().length - (baseLotsToUiConvertor.toString().indexOf('.') + 1);
-
-    const bids = marketContext.bids;
-    const asks = marketContext.asks;
-
-    const aggBid = marketContext.aggBid;
-    const aggAsk = marketContext.aggAsk;
-    if (aggBid === undefined || aggAsk === undefined) {
-        return [];
-    }
-    const fairValue: number = (aggBid + aggAsk) / 2;
-    if (globalThis.lastFairValue === undefined) {
-        globalThis.lastFairValue = [];
-    }
-
-    if (globalThis.lastFairValue[marketName] === undefined) {
-        globalThis.lastFairValue[marketName] = fairValue;
-    }
-
-    const volatility = Math.abs(fairValue - globalThis.lastFairValue[marketName]);
-    const volatilityPercentage = percentageVolatility(fairValue, globalThis.lastFairValue[marketName]);
-    const aggSpread: number = (aggAsk - aggBid) / fairValue;
-
-    let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
-    let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-    if (averageTPS < 500 || volatilityPercentage > 0.5) {
-        bidCharge += 0.01;
-        askCharge += 0.01;
-        message += `\nAverage TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`;
-    } else if (averageTPS < 1000 || volatilityPercentage > 0.3) {
-        bidCharge += 0.005;
-        askCharge += 0.005;
-        message += `\nAverage TPS: ${averageTPS} < 1000 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.3`;
-    } else if (averageTPS < 1500 || volatilityPercentage > 0.2) {
-        bidCharge += 0.002;
-        askCharge += 0.002;
-        message += `\nAverage TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`;
-    }
-    globalThis.lastFairValue[marketName] = fairValue;
-    let bidPrice = fairValue * (1 - bidCharge);
-    let askPrice = fairValue * (1 + askCharge);
-
-    // Re-calculate Order Price if too volatility
-    if (bidPrice > aggBid) {
-        bidPrice = aggBid * (1 - bidCharge);
-    }
-    if (askPrice < aggAsk) {
-        askPrice = aggAsk * (1 + askCharge);
-    }
-
-    // Start building the transaction
-    const instructions: TransactionInstruction[] = [
-        makeCheckAndSetSequenceNumberInstruction(
-            marketContext.sequenceAccount,
+        const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
+            mangoProgramId,
+            group.publicKey,
+            mangoAccount.publicKey,
             payer.publicKey,
-            Math.round(getUnixTs() * 1000),
-        ),
-    ];
+            market.publicKey,
+            market.bids,
+            market.asks,
+            new BN(20),
+        );
 
-    const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
-        mangoProgramId,
-        group.publicKey,
-        mangoAccount.publicKey,
-        payer.publicKey,
-        market.publicKey,
-        market.bids,
-        market.asks,
-        new BN(20),
-    );
-
-    const currentTimeInSecond = Date.now() / 1000;
-    const timeToLive = marketContext.params.timeToLive || 3600;
-    message += `\nBids Count: ${bids.leafCount} - Asks Count: ${asks.leafCount}`;
-    const maxDepth = market.liquidityMiningInfo.maxDepthBps.toNumber() * baseLotsToUiConvertor;
-    if (bids.leafCount < asks.leafCount) {
-        let bidCount = 0;
-        for (const bid of bids) {
-            if (bidCount === 20) break;
-            bidCount++;
-            if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
-                bidCount = 20;
-                // Case 1: On OrderBook too long
-                const diffInSeconds = currentTimeInSecond - bid?.timestamp.toNumber();
-                if (diffInSeconds > timeToLive) {
-                    const checkRoom = marketContext.params.checkRoom;
-                    message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
-                    message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
-                    message += `\nBid Time: ${new Date(bid?.timestamp.toNumber() * 1000).toLocaleString()}`;
-                    message += `\nCheck Room: ${checkRoom}`
-                    if (checkRoom === true) {
-                        let cumulativeToBidPrice = 0;
-                        for (const b of bids) {
-                            // Ignore owner account
-                            if (b.owner.toString() === mangoAccount.publicKey.toString()) {
-                                break;
-                            }
-                            if (cumulativeToBidPrice > (maxDepth * marketContext.params.room)) {
-                                break;
-                            }
-                            cumulativeToBidPrice += b.size;
-                        }
-                        message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
-                        if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
-                            message += `\nHas room to cancel.`;
-                            instructions.push(cancelAllInstr);
-                        } else {
-                            message += `\nNo room to cancel.`;
-                            console.log(message);
-                        }
-                    } else {
-                        instructions.push(cancelAllInstr);
-                    }
-                } else if (bid.price > bidPrice || bid.price > aggBid) {
-                    // Case 2: Bid is not good - might be hang
-                    message += `\nCase 2: Bid is not good - might be hang`;
-                    message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
-                    message += `\nBid Price: ${bidPrice.toFixed(priceLotsDecimals)} - Bidding: ${bid.price.toFixed(priceLotsDecimals)} - bidCharge: ${(bidCharge * 100).toFixed(2)}%`;
-                    instructions.push(cancelAllInstr);
-                }
-            }
-        }
-    } else {
-        let askCount = 0;
-        for (const ask of asks) {
-            if (askCount === 20) break;
-            askCount++;
-            if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
-                askCount = 20;
-                // Case 1: On OrderBook too long
-                const diffInSeconds = currentTimeInSecond - ask?.timestamp.toNumber();
-                if (diffInSeconds > timeToLive) {
-                    const checkRoom = marketContext.params.checkRoom;
-                    // Case 2: Ask is not good - might be hang
-                    message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
-                    message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
-                    message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
-                    if (checkRoom === true) {
-                        let cumulativeToAskPrice = 0;
-                        for (const a of asks) {
-                            // Ignore owner account
-                            if (a.owner.toString() === mangoAccount.publicKey.toString()) {
-                                break;
-                            }
-                            if (cumulativeToAskPrice > (maxDepth * marketContext.params.room)) {
-                                break;
-                            }
-                            cumulativeToAskPrice += a.size;
-                        }
-                        message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
-                        if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
-                            message += `\nHas room to cancel.`;
-                            instructions.push(cancelAllInstr);
-                        } else {
-                            message += `\nNo room to cancel.`;
-                            console.log(message);
-                        }
-                    } else {
-                        instructions.push(cancelAllInstr);
-                    }
-                } else if (ask.price < askPrice || ask.price < aggAsk) {
-                    // Case 2: Ask is not good - might be hang
-                    message += `\nCase 2: Ask is not good - might be hang`;
-                    message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
-                    message += `\nAsk Price: ${askPrice.toFixed(priceLotsDecimals)} - Asking: ${ask.price.toFixed(priceLotsDecimals)} - askCharge: ${(askCharge * 100).toFixed(2)}%`;
-                    instructions.push(cancelAllInstr);
-                }
-            }
-        }
-    }
-    // if instruction is only the sequence enforcement, then just send empty
-    if (instructions.length === 1) {
-        return [];
-    } else {
-        message += `\nCancelling ...`;
-        console.log(message);
-        if (globalThis.lastSendTelegram === undefined) {
-            bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
-            globalThis.lastSendTelegram = Date.now() / 1000;
-        } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 15) {
-            bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
-            globalThis.lastSendTelegram = Date.now() / 1000;
-        }
+        instructions.push(cancelAllInstr);
         return instructions;
+    } else {
+        console.log('No open orders');
+        return [];
     }
+
+    // const priceLotsToUiConvertor = market.priceLotsToUiConvertor;
+    // const priceLotsDecimals = priceLotsToUiConvertor.toString().length - (priceLotsToUiConvertor.toString().indexOf('.') + 1);
+
+    // const baseLotsToUiConvertor = market.baseLotsToUiConvertor;
+    // const baseLotsDecimals = baseLotsToUiConvertor.toString().length - (baseLotsToUiConvertor.toString().indexOf('.') + 1);
+
+    // const bids = marketContext.bids;
+    // const asks = marketContext.asks;
+
+    // const aggBid = marketContext.aggBid;
+    // const aggAsk = marketContext.aggAsk;
+    // if (aggBid === undefined || aggAsk === undefined) {
+    //     return [];
+    // }
+    // const fairValue: number = (aggBid + aggAsk) / 2;
+    // if (globalThis.lastFairValue === undefined) {
+    //     globalThis.lastFairValue = [];
+    // }
+
+    // if (globalThis.lastFairValue[marketName] === undefined) {
+    //     globalThis.lastFairValue[marketName] = fairValue;
+    // }
+
+    // const volatility = Math.abs(fairValue - globalThis.lastFairValue[marketName]);
+    // const volatilityPercentage = percentageVolatility(fairValue, globalThis.lastFairValue[marketName]);
+    // const aggSpread: number = (aggAsk - aggBid) / fairValue;
+
+    // let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
+    // let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
+    // if (averageTPS < 500 || volatilityPercentage > 0.5) {
+    //     bidCharge += 0.01;
+    //     askCharge += 0.01;
+    //     message += `\nAverage TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`;
+    // } else if (averageTPS < 1000 || volatilityPercentage > 0.3) {
+    //     bidCharge += 0.005;
+    //     askCharge += 0.005;
+    //     message += `\nAverage TPS: ${averageTPS} < 1000 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.3`;
+    // } else if (averageTPS < 1500 || volatilityPercentage > 0.2) {
+    //     bidCharge += 0.002;
+    //     askCharge += 0.002;
+    //     message += `\nAverage TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`;
+    // }
+    // globalThis.lastFairValue[marketName] = fairValue;
+    // let bidPrice = fairValue * (1 - bidCharge);
+    // let askPrice = fairValue * (1 + askCharge);
+
+    // // Re-calculate Order Price if too volatility
+    // if (bidPrice > aggBid) {
+    //     bidPrice = aggBid * (1 - bidCharge);
+    // }
+    // if (askPrice < aggAsk) {
+    //     askPrice = aggAsk * (1 + askCharge);
+    // }
+
+    // // Start building the transaction
+    // const instructions: TransactionInstruction[] = [
+    //     makeCheckAndSetSequenceNumberInstruction(
+    //         marketContext.sequenceAccount,
+    //         payer.publicKey,
+    //         Math.round(getUnixTs() * 1000),
+    //     ),
+    // ];
+
+    // const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
+    //     mangoProgramId,
+    //     group.publicKey,
+    //     mangoAccount.publicKey,
+    //     payer.publicKey,
+    //     market.publicKey,
+    //     market.bids,
+    //     market.asks,
+    //     new BN(20),
+    // );
+
+    // const currentTimeInSecond = Date.now() / 1000;
+    // const timeToLive = marketContext.params.timeToLive || 3600;
+    // message += `\nBids Count: ${bids.leafCount} - Asks Count: ${asks.leafCount}`;
+    // const maxDepth = market.liquidityMiningInfo.maxDepthBps.toNumber() * baseLotsToUiConvertor;
+    // if (bids.leafCount < asks.leafCount) {
+    //     let bidCount = 0;
+    //     for (const bid of bids) {
+    //         if (bidCount === 20) break;
+    //         bidCount++;
+    //         if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
+    //             bidCount = 20;
+    //             // Case 1: On OrderBook too long
+    //             const diffInSeconds = currentTimeInSecond - bid?.timestamp.toNumber();
+    //             if (diffInSeconds > timeToLive) {
+    //                 const checkRoom = marketContext.params.checkRoom;
+    //                 message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
+    //                 message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
+    //                 message += `\nBid Time: ${new Date(bid?.timestamp.toNumber() * 1000).toLocaleString()}`;
+    //                 message += `\nCheck Room: ${checkRoom}`
+    //                 if (checkRoom === true) {
+    //                     let cumulativeToBidPrice = 0;
+    //                     for (const b of bids) {
+    //                         // Ignore owner account
+    //                         if (b.owner.toString() === mangoAccount.publicKey.toString()) {
+    //                             break;
+    //                         }
+    //                         if (cumulativeToBidPrice > (maxDepth * marketContext.params.room)) {
+    //                             break;
+    //                         }
+    //                         cumulativeToBidPrice += b.size;
+    //                     }
+    //                     message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+    //                     if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
+    //                         message += `\nHas room to cancel.`;
+    //                         instructions.push(cancelAllInstr);
+    //                     } else {
+    //                         message += `\nNo room to cancel.`;
+    //                         console.log(message);
+    //                     }
+    //                 } else {
+    //                     instructions.push(cancelAllInstr);
+    //                 }
+    //             } else if (bid.price > bidPrice || bid.price > aggBid) {
+    //                 // Case 2: Bid is not good - might be hang
+    //                 message += `\nCase 2: Bid is not good - might be hang`;
+    //                 message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
+    //                 message += `\nBid Price: ${bidPrice.toFixed(priceLotsDecimals)} - Bidding: ${bid.price.toFixed(priceLotsDecimals)} - bidCharge: ${(bidCharge * 100).toFixed(2)}%`;
+    //                 instructions.push(cancelAllInstr);
+    //             }
+    //         }
+    //     }
+    // } else {
+    //     let askCount = 0;
+    //     for (const ask of asks) {
+    //         if (askCount === 20) break;
+    //         askCount++;
+    //         if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
+    //             askCount = 20;
+    //             // Case 1: On OrderBook too long
+    //             const diffInSeconds = currentTimeInSecond - ask?.timestamp.toNumber();
+    //             if (diffInSeconds > timeToLive) {
+    //                 const checkRoom = marketContext.params.checkRoom;
+    //                 // Case 2: Ask is not good - might be hang
+    //                 message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
+    //                 message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
+    //                 message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
+    //                 if (checkRoom === true) {
+    //                     let cumulativeToAskPrice = 0;
+    //                     for (const a of asks) {
+    //                         // Ignore owner account
+    //                         if (a.owner.toString() === mangoAccount.publicKey.toString()) {
+    //                             break;
+    //                         }
+    //                         if (cumulativeToAskPrice > (maxDepth * marketContext.params.room)) {
+    //                             break;
+    //                         }
+    //                         cumulativeToAskPrice += a.size;
+    //                     }
+    //                     message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+    //                     if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
+    //                         message += `\nHas room to cancel.`;
+    //                         instructions.push(cancelAllInstr);
+    //                     } else {
+    //                         message += `\nNo room to cancel.`;
+    //                         console.log(message);
+    //                     }
+    //                 } else {
+    //                     instructions.push(cancelAllInstr);
+    //                 }
+    //             } else if (ask.price < askPrice || ask.price < aggAsk) {
+    //                 // Case 2: Ask is not good - might be hang
+    //                 message += `\nCase 2: Ask is not good - might be hang`;
+    //                 message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
+    //                 message += `\nAsk Price: ${askPrice.toFixed(priceLotsDecimals)} - Asking: ${ask.price.toFixed(priceLotsDecimals)} - askCharge: ${(askCharge * 100).toFixed(2)}%`;
+    //                 instructions.push(cancelAllInstr);
+    //             }
+    //         }
+    //     }
+    // }
+    // // if instruction is only the sequence enforcement, then just send empty
+    // if (instructions.length === 1) {
+    //     return [];
+    // } else {
+    //     message += `\nCancelling ...`;
+    //     console.log(message);
+    //     if (globalThis.lastSendTelegram === undefined) {
+    //         bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
+    //         globalThis.lastSendTelegram = Date.now() / 1000;
+    //     } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 15) {
+    //         bot.telegram.sendMessage(process.env.TELEGRAM_CHANNEL_ID, message);
+    //         globalThis.lastSendTelegram = Date.now() / 1000;
+    //     }
+    //     return instructions;
+    // }
 }
 
 async function onExit(
