@@ -202,33 +202,33 @@ async function loadAccountAndMarketState(
     };
 }
 
-async function initSeqEnfAccounts(
-    client: MangoClient,
-    marketContexts: MarketContext[],
-) {
-    // Initialize all the sequence accounts
-    const seqAccInstrs = marketContexts.map((mc) =>
-        makeInitSequenceInstruction(
-            mc.sequenceAccount,
-            payer.publicKey,
-            mc.sequenceAccountBump,
-            mc.marketName,
-        ),
-    );
-    const seqAccTx = new Transaction();
-    seqAccTx.add(...seqAccInstrs);
+// async function initSeqEnfAccounts(
+//     client: MangoClient,
+//     marketContexts: MarketContext[],
+// ) {
+//     // Initialize all the sequence accounts
+//     const seqAccInstrs = marketContexts.map((mc) =>
+//         makeInitSequenceInstruction(
+//             mc.sequenceAccount,
+//             payer.publicKey,
+//             mc.sequenceAccountBump,
+//             mc.marketName,
+//         ),
+//     );
+//     const seqAccTx = new Transaction();
+//     seqAccTx.add(...seqAccInstrs);
 
-    while (true) {
-        try {
-            const seqAccTxid = await client.sendTransaction(seqAccTx, payer, []);
-        } catch (e) {
-            console.log('failed to initialize sequence enforcer');
-            console.log(e);
-            continue;
-        }
-        break;
-    }
-}
+//     while (true) {
+//         try {
+//             const seqAccTxid = await client.sendTransaction(seqAccTx, payer, []);
+//         } catch (e) {
+//             console.log('failed to initialize sequence enforcer');
+//             console.log(e);
+//             continue;
+//         }
+//         break;
+//     }
+// }
 async function mainCancel() {
     const connection = new Connection(
         process.env.ENDPOINT_URL || config.cluster_urls[cluster],
@@ -314,19 +314,19 @@ async function mainCancel() {
             lastOrderUpdate: 0,
         });
     }
-    initSeqEnfAccounts(client, marketContexts);
-    const symbolToContext = Object.fromEntries(
-        marketContexts.map((mc) => [mc.marketName, mc]),
-    );
-    const mdListeners: child_process.ChildProcess[] = listenersArray(params.processes, Object.keys(params.assets)).map((assetArray) => {
-        const listener = child_process.fork(require.resolve('./listen'), [assetArray.map((a) => `${a}-PERP`).join(',')]);
-        listener.on('message', (m: ListenerMessage) => {
-            symbolToContext[m.marketName].aggBid = m.aggBid;
-            symbolToContext[m.marketName].aggAsk = m.aggAsk;
-            symbolToContext[m.marketName].ftxMid = m.ftxMid;
-        });
-        return listener;
-    })
+    // initSeqEnfAccounts(client, marketContexts);
+    // const symbolToContext = Object.fromEntries(
+    //     marketContexts.map((mc) => [mc.marketName, mc]),
+    // );
+    // const mdListeners: child_process.ChildProcess[] = listenersArray(params.processes, Object.keys(params.assets)).map((assetArray) => {
+    //     const listener = child_process.fork(require.resolve('./listen'), [assetArray.map((a) => `${a}-PERP`).join(',')]);
+    //     listener.on('message', (m: ListenerMessage) => {
+    //         symbolToContext[m.marketName].aggBid = m.aggBid;
+    //         symbolToContext[m.marketName].aggAsk = m.aggAsk;
+    //         symbolToContext[m.marketName].ftxMid = m.ftxMid;
+    //     });
+    //     return listener;
+    // })
 
     const state = await loadAccountAndMarketState(
         connection,
@@ -336,13 +336,13 @@ async function mainCancel() {
     );
     // listenState(client, state);
     const stateRefreshInterval = params.stateRefreshInterval || 500;
-    listenAccountAndMarketState(
-        connection,
-        mangoGroup,
-        state,
-        stateRefreshInterval,
-        mdListeners
-    );
+    // listenAccountAndMarketState(
+    //     connection,
+    //     mangoGroup,
+    //     state,
+    //     stateRefreshInterval,
+    //     mdListeners
+    // );
 
     process.on('SIGINT', function () {
         console.log('Caught keyboard interrupt. Canceling orders');
@@ -365,106 +365,106 @@ async function mainCancel() {
     }
 }
 
-/**
- * Periodically fetch the account and market state
- */
-async function listenAccountAndMarketState(
-    connection: Connection,
-    group: MangoGroup,
-    state: State,
-    stateRefreshInterval: number,
-    mdListeners: child_process.ChildProcess[]
-) {
-    while (control.isRunning) {
-        try {
-            const inBasketOpenOrders = state.mangoAccount
-                .getOpenOrdersKeysInBasket()
-                .filter((pk) => !pk.equals(zeroKey));
+// /**
+//  * Periodically fetch the account and market state
+//  */
+// async function listenAccountAndMarketState(
+//     connection: Connection,
+//     group: MangoGroup,
+//     state: State,
+//     stateRefreshInterval: number,
+//     mdListeners: child_process.ChildProcess[]
+// ) {
+//     while (control.isRunning) {
+//         try {
+//             const inBasketOpenOrders = state.mangoAccount
+//                 .getOpenOrdersKeysInBasket()
+//                 .filter((pk) => !pk.equals(zeroKey));
 
-            const allAccounts = [
-                group.mangoCache,
-                state.mangoAccount.publicKey,
-                ...inBasketOpenOrders,
-                ...state.marketContexts.map(
-                    (marketContext) => marketContext.market.bids,
-                ),
-                ...state.marketContexts.map(
-                    (marketContext) => marketContext.market.asks,
-                ),
-            ];
+//             const allAccounts = [
+//                 group.mangoCache,
+//                 state.mangoAccount.publicKey,
+//                 ...inBasketOpenOrders,
+//                 ...state.marketContexts.map(
+//                     (marketContext) => marketContext.market.bids,
+//                 ),
+//                 ...state.marketContexts.map(
+//                     (marketContext) => marketContext.market.asks,
+//                 ),
+//             ];
 
-            const ts = getUnixTs();
-            const accountInfos = await getMultipleAccounts(connection, allAccounts);
+//             const ts = getUnixTs();
+//             const accountInfos = await getMultipleAccounts(connection, allAccounts);
 
-            const cache = new MangoCache(
-                accountInfos[0].publicKey,
-                MangoCacheLayout.decode(accountInfos[0].accountInfo.data),
-            );
+//             const cache = new MangoCache(
+//                 accountInfos[0].publicKey,
+//                 MangoCacheLayout.decode(accountInfos[0].accountInfo.data),
+//             );
 
-            const mangoAccount = new MangoAccount(
-                accountInfos[1].publicKey,
-                MangoAccountLayout.decode(accountInfos[1].accountInfo.data),
-            );
-            const openOrdersAis = accountInfos.slice(
-                2,
-                2 + inBasketOpenOrders.length,
-            );
-            for (let i = 0; i < openOrdersAis.length; i++) {
-                const ai = openOrdersAis[i];
-                const marketIndex = mangoAccount.spotOpenOrders.findIndex((soo) =>
-                    soo.equals(ai.publicKey),
-                );
-                mangoAccount.spotOpenOrdersAccounts[marketIndex] =
-                    OpenOrders.fromAccountInfo(
-                        ai.publicKey,
-                        ai.accountInfo,
-                        group.dexProgramId,
-                    );
-            }
+//             const mangoAccount = new MangoAccount(
+//                 accountInfos[1].publicKey,
+//                 MangoAccountLayout.decode(accountInfos[1].accountInfo.data),
+//             );
+//             const openOrdersAis = accountInfos.slice(
+//                 2,
+//                 2 + inBasketOpenOrders.length,
+//             );
+//             for (let i = 0; i < openOrdersAis.length; i++) {
+//                 const ai = openOrdersAis[i];
+//                 const marketIndex = mangoAccount.spotOpenOrders.findIndex((soo) =>
+//                     soo.equals(ai.publicKey),
+//                 );
+//                 mangoAccount.spotOpenOrdersAccounts[marketIndex] =
+//                     OpenOrders.fromAccountInfo(
+//                         ai.publicKey,
+//                         ai.accountInfo,
+//                         group.dexProgramId,
+//                     );
+//             }
 
-            accountInfos
-                .slice(
-                    2 + inBasketOpenOrders.length,
-                    2 + inBasketOpenOrders.length + state.marketContexts.length,
-                )
-                .forEach((ai, i) => {
-                    state.marketContexts[i].bids = new BookSide(
-                        ai.publicKey,
-                        state.marketContexts[i].market,
-                        BookSideLayout.decode(ai.accountInfo.data),
-                    );
-                });
+//             accountInfos
+//                 .slice(
+//                     2 + inBasketOpenOrders.length,
+//                     2 + inBasketOpenOrders.length + state.marketContexts.length,
+//                 )
+//                 .forEach((ai, i) => {
+//                     state.marketContexts[i].bids = new BookSide(
+//                         ai.publicKey,
+//                         state.marketContexts[i].market,
+//                         BookSideLayout.decode(ai.accountInfo.data),
+//                     );
+//                 });
 
-            accountInfos
-                .slice(
-                    2 + inBasketOpenOrders.length + state.marketContexts.length,
-                    2 + inBasketOpenOrders.length + 2 * state.marketContexts.length,
-                )
-                .forEach((ai, i) => {
-                    state.marketContexts[i].lastBookUpdate = ts;
-                    state.marketContexts[i].asks = new BookSide(
-                        ai.publicKey,
-                        state.marketContexts[i].market,
-                        BookSideLayout.decode(ai.accountInfo.data),
-                    );
-                });
+//             accountInfos
+//                 .slice(
+//                     2 + inBasketOpenOrders.length + state.marketContexts.length,
+//                     2 + inBasketOpenOrders.length + 2 * state.marketContexts.length,
+//                 )
+//                 .forEach((ai, i) => {
+//                     state.marketContexts[i].lastBookUpdate = ts;
+//                     state.marketContexts[i].asks = new BookSide(
+//                         ai.publicKey,
+//                         state.marketContexts[i].market,
+//                         BookSideLayout.decode(ai.accountInfo.data),
+//                     );
+//                 });
 
-            state.mangoAccount = mangoAccount;
-            state.cache = cache;
-            state.lastMangoAccountUpdate = ts;
+//             state.mangoAccount = mangoAccount;
+//             state.cache = cache;
+//             state.lastMangoAccountUpdate = ts;
 
-            const equity = mangoAccount.computeValue(group, cache).toNumber();
-            mdListeners.map((mdListener) => mdListener.send({ equity: equity }));
-        } catch (e) {
-            console.error(
-                `${new Date().getUTCDate().toString()} failed when loading state`,
-                e,
-            );
-        } finally {
-            await sleep(stateRefreshInterval);
-        }
-    }
-}
+//             const equity = mangoAccount.computeValue(group, cache).toNumber();
+//             mdListeners.map((mdListener) => mdListener.send({ equity: equity }));
+//         } catch (e) {
+//             console.error(
+//                 `${new Date().getUTCDate().toString()} failed when loading state`,
+//                 e,
+//             );
+//         } finally {
+//             await sleep(stateRefreshInterval);
+//         }
+//     }
+// }
 
 async function onExit(
     client: MangoClient,
