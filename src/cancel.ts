@@ -624,9 +624,12 @@ function makeMarketUpdateInstructions(
 
     let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
     let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-    if (averageTPS < 500 || volatilityPercentage > 0.5) {
-        bidCharge += 0.01;
-        askCharge += 0.01;
+    if (averageTPS < 100 || volatilityPercentage > 1) {
+        bidCharge += 0.05;
+        askCharge += 0.05;
+    } else if (averageTPS < 500 || volatilityPercentage > 0.5) {
+        bidCharge += 0.009;
+        askCharge += 0.009;
         message += `\nAverage TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`;
     } else if (averageTPS < 1000 || volatilityPercentage > 0.3) {
         bidCharge += 0.005;
@@ -701,13 +704,13 @@ function makeMarketUpdateInstructions(
                             cumulativeToBidPrice += b.size;
                         }
                         message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
-                        // if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
+                        if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
                             message += `\nHas room to cancel.`;
                             instructions.push(cancelAllInstr);
-                        // } else {
-                        //     message += `\nNo room to cancel.`;
-                        //     console.log(message);
-                        // }
+                        } else {
+                            message += `\nNo room to cancel.`;
+                            console.log(message);
+                        }
                     } else {
                         instructions.push(cancelAllInstr);
                     }
@@ -748,13 +751,13 @@ function makeMarketUpdateInstructions(
                             cumulativeToAskPrice += a.size;
                         }
                         message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
-                        // if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
+                        if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
                             message += `\nHas room to cancel.`;
                             instructions.push(cancelAllInstr);
-                        // } else {
-                            // message += `\nNo room to cancel.`;
-                            // console.log(message);
-                        // }
+                        } else {
+                            message += `\nNo room to cancel.`;
+                            console.log(message);
+                        }
                     } else {
                         instructions.push(cancelAllInstr);
                     }
