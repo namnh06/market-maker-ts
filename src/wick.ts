@@ -605,7 +605,10 @@ function makeMarketUpdateInstructions(
 
     let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
     let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-    if (averageTPS < 500 || volatilityPercentage > 0.5) {
+    if (averageTPS < 100 || volatilityPercentage > 1) {
+        bidCharge += 0.05;
+        askCharge += 0.05;
+    } else if (averageTPS < 500 || volatilityPercentage > 0.5) {
         bidCharge += 0.01;
         askCharge += 0.01;
         console.log(`${marketName} - Average TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`);
@@ -710,8 +713,8 @@ function makeMarketUpdateInstructions(
         );
 
         const expiryTimestamp =
-            params.tif !== undefined
-                ? new BN((Date.now() / 1000) + params.tif)
+            marketContext.params.tif !== undefined
+                ? new BN((Date.now() / 1000) + marketContext.params.tif)
                 : new BN(0);
 
         const placeBidInstr = makePlacePerpOrder2Instruction(
