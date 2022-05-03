@@ -684,13 +684,14 @@ function makeMarketUpdateInstructions(
             bidCount++;
             if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
                 bidCount = 20;
-                // Case 1: On OrderBook too long
                 const nearTIF = currentTimeInSecond - bid?.timestamp.toNumber() + 30;
                 const diffInSeconds = currentTimeInSecond - bid?.timestamp.toNumber();
                 if (nearTIF > timeInForce) {
+                    message += `\nCase 0: Near time in force - tif: ${timeInForce}`;
                     message += `\nNear time in force, has to cancel`;
                     instructions.push(cancelAllInstr);
                 } else if (diffInSeconds > timeToLive) {
+                    // Case 1: On OrderBook too long
                     const checkRoom = marketContext.params.checkRoom;
                     message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
                     message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
@@ -735,15 +736,16 @@ function makeMarketUpdateInstructions(
             askCount++;
             if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
                 askCount = 20;
-                // Case 1: On OrderBook too long
+
                 const nearTIF = currentTimeInSecond - ask?.timestamp.toNumber() + 30;
                 const diffInSeconds = currentTimeInSecond - ask?.timestamp.toNumber();
                 if (nearTIF > timeInForce) {
+                    message += `\nCase 0: Near time in force - tif: ${timeInForce}`;
                     message += `\nNear time in force, has to cancel`;
                     instructions.push(cancelAllInstr);
                 } else if (diffInSeconds > timeToLive) {
                     const checkRoom = marketContext.params.checkRoom;
-                    // Case 2: Ask is not good - might be hang
+                    // Case 1: On OrderBook too long
                     message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
                     message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
                     message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
