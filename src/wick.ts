@@ -687,7 +687,8 @@ function makeMarketUpdateInstructions(
             Math.abs(marketContext.sentBidPrice / bookAdjBid.toNumber() - 1) >
             requoteThresh ||
             Math.abs(marketContext.sentAskPrice / bookAdjAsk.toNumber() - 1) >
-            requoteThresh;
+            requoteThresh ||
+            (params.tif !== undefined && marketContext.lastOrderUpdate + params.tif < getUnixTs());
     }
 
     // Start building the transaction
@@ -713,8 +714,8 @@ function makeMarketUpdateInstructions(
         );
 
         const expiryTimestamp =
-            marketContext.params.tif !== undefined
-                ? new BN(Math.floor((Date.now() / 1000)) + marketContext.params.tif)
+            params.tif !== undefined
+                ? new BN((Date.now() / 1000) + params.tif)
                 : new BN(0);
 
         const placeBidInstr = makePlacePerpOrder2Instruction(
