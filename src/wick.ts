@@ -714,7 +714,7 @@ function makeMarketUpdateInstructions(
 
         const expiryTimestamp =
             marketContext.params.tif !== undefined
-                ? new BN((Date.now() / 1000) + marketContext.params.tif)
+                ? new BN(Math.floor((Date.now() / 1000)) + marketContext.params.tif)
                 : new BN(0);
 
         const placeBidInstr = makePlacePerpOrder2Instruction(
@@ -824,13 +824,13 @@ async function onExit(
         );
         tx.add(cancelAllInstr);
         if (tx.instructions.length === params.batch) {
-            // txProms.push(client.sendTransaction(tx, payer, []));
+            txProms.push(client.sendTransaction(tx, payer, []));
             tx = new Transaction();
         }
     }
 
     if (tx.instructions.length) {
-        // txProms.push(client.sendTransaction(tx, payer, []));
+        txProms.push(client.sendTransaction(tx, payer, []));
     }
     const txids = await Promise.all(txProms);
     txids.forEach((txid) => {
