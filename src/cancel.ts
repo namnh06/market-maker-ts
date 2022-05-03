@@ -699,7 +699,7 @@ function makeMarketUpdateInstructions(
                 if (nearTIF > timeInForce) {
                     // Case 1: On OrderBook too long
                     const checkRoom = marketContext.params.checkRoom;
-                    message += `\nCase 1: On OrderBook too long - TIF}`;
+                    message += `\nCase 1: On OrderBook too long - TIF`;
                     message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
                     message += `\nBid Time: ${new Date(bid?.timestamp.toNumber() * 1000).toLocaleString()}`;
                     message += `\nCheck Room: ${checkRoom}`;
