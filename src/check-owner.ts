@@ -272,27 +272,27 @@ function checkOwner(
     // console.log(priceLotsToUiConvertor);
     const bids = marketContext.bids;
     let bidCount = 0;
-    for (const bid of bids) {
-        bidCount++;
-        if (bidCount > 50) {
-            break;
-        }
-        if (bid.size > 7) {
-            console.log(`owner: ${bid.owner} - size: ${bid.size} - price: ${bid.price}`);
-        }
-    }
-
-    // const asks = marketContext.asks;
-    // let askCount = 0;
-    // for (const ask of asks) {
-    //     askCount++;
-    //     if (askCount > 50) {
+    // for (const bid of bids) {
+    //     bidCount++;
+    //     if (bidCount > 50) {
     //         break;
     //     }
-    //     if (ask.size > 692) {
-    //         console.log(`owner: ${ask.owner} - size: ${ask.size} - price: ${ask.price}`);
+    //     if (bid.size > 7) {
+    //         console.log(`owner: ${bid.owner} - size: ${bid.size} - price: ${bid.price}`);
     //     }
     // }
+
+    const asks = marketContext.asks;
+    let askCount = 0;
+    for (const ask of asks) {
+        askCount++;
+        if (askCount > 20) {
+            break;
+        }
+        if (ask.size > 9) {
+            console.log(`owner: ${ask.owner} - size: ${ask.size} - price: ${ask.price}`);
+        }
+    }
 
     return marketMessage;
 }

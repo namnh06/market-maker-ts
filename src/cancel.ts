@@ -674,6 +674,7 @@ function makeMarketUpdateInstructions(
 
     const currentTimeInSecond = Date.now() / 1000;
     const timeToLive = marketContext.params.timeToLive || 3600;
+    const timeInForce = marketContext.params.tif || 3600;
     message += `\nBids Count: ${bids.leafCount} - Asks Count: ${asks.leafCount}`;
     const maxDepth = market.liquidityMiningInfo.maxDepthBps.toNumber() * baseLotsToUiConvertor;
     if (bids.leafCount < asks.leafCount) {
@@ -684,8 +685,12 @@ function makeMarketUpdateInstructions(
             if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
                 bidCount = 20;
                 // Case 1: On OrderBook too long
+                const nearTIF = currentTimeInSecond - bid?.timestamp.toNumber() + 30;
                 const diffInSeconds = currentTimeInSecond - bid?.timestamp.toNumber();
-                if (diffInSeconds > timeToLive) {
+                if (nearTIF > timeInForce) {
+                    message += `\nNear time in force, has to cancel`;
+                    instructions.push(cancelAllInstr);
+                } else if (diffInSeconds > timeToLive) {
                     const checkRoom = marketContext.params.checkRoom;
                     message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
                     message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
@@ -731,8 +736,12 @@ function makeMarketUpdateInstructions(
             if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
                 askCount = 20;
                 // Case 1: On OrderBook too long
+                const nearTIF = currentTimeInSecond - ask?.timestamp.toNumber() + 30;
                 const diffInSeconds = currentTimeInSecond - ask?.timestamp.toNumber();
-                if (diffInSeconds > timeToLive) {
+                if (nearTIF > timeInForce) {
+                    message += `\nNear time in force, has to cancel`;
+                    instructions.push(cancelAllInstr);
+                } else if (diffInSeconds > timeToLive) {
                     const checkRoom = marketContext.params.checkRoom;
                     // Case 2: Ask is not good - might be hang
                     message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
