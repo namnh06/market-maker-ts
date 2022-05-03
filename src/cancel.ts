@@ -387,9 +387,9 @@ async function mainCancel() {
                         j++;
                         if (j === params.batch) {
                             if (averageTPS < params.averageTPS) {
-                                // sendDupTxs(client, tx, [], 10);
+                                sendDupTxs(client, tx, [], 10);
                             } else {
-                                // client.sendTransaction(tx, payer, [], null);
+                                client.sendTransaction(tx, payer, [], null);
                             }
                             tx = new Transaction();
                             j = 0;
@@ -399,9 +399,9 @@ async function mainCancel() {
             }
             if (tx.instructions.length) {
                 if (averageTPS < params.averageTPS) {
-                    // sendDupTxs(client, tx, [], 10);
+                    sendDupTxs(client, tx, [], 10);
                 } else {
-                    // client.sendTransaction(tx, payer, [], null);
+                    client.sendTransaction(tx, payer, [], null);
                 }
             }
         } catch (e) {
@@ -688,109 +688,111 @@ function makeMarketUpdateInstructions(
         .filter((o) => o.marketIndex === marketIndex);
     const bidsLeafCount = bids.leafCount > 100 ? 100 : bids.leafCount;
     const asksLeafCount = asks.leafCount > 100 ? 100 : asks.leafCount;
-    if (bidsLeafCount <= asksLeafCount) {
-        let bidCount: number = 1;
-        for (const bid of bids) {
-            if (bidCount === 0) break;
-            bidCount++;
-            if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
-                bidCount = 0;
-                const nearTIF = currentTimeInSecond - bid?.timestamp.toNumber();
-                if (nearTIF > timeInForce) {
-                    // Case 1: On OrderBook too long
-                    const checkRoom = marketContext.params.checkRoom;
-                    message += `\nCase 1: On OrderBook too long - TIF`;
-                    message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
-                    message += `\nBid Time: ${new Date(bid?.timestamp.toNumber() * 1000).toLocaleString()}`;
-                    message += `\nCheck Room: ${checkRoom}`;
-                    const forceTIF = nearTIF > 245 ? true : false;
-                    if (forceTIF) {
-                        message += `\nForcing TIF: ${nearTIF}`;
-                        instructions.push(cancelAllInstr);
-                    } else if (checkRoom) {
-                        let cumulativeToBidPrice = 0;
-                        for (const b of bids) {
-                            // Ignore owner account
-                            if (b.owner.toString() === mangoAccount.publicKey.toString()) {
-                                break;
-                            }
-                            if (cumulativeToBidPrice > (maxDepth * marketContext.params.room)) {
-                                break;
-                            }
-                            cumulativeToBidPrice += b.size;
-                        }
-                        message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)}`;
-                        message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
-                        if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
-                            message += `\nHas room to cancel.`;
+    if (openOrders.length > 0) {
+        if (bidsLeafCount <= asksLeafCount) {
+            let bidCount: number = 1;
+            for (const bid of bids) {
+                if (bidCount === 0) break;
+                bidCount++;
+                if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
+                    bidCount = 0;
+                    const nearTIF = currentTimeInSecond - bid?.timestamp.toNumber();
+                    if (nearTIF > timeInForce) {
+                        // Case 1: On OrderBook too long
+                        const checkRoom = marketContext.params.checkRoom;
+                        message += `\nCase 1: On OrderBook too long - TIF`;
+                        message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
+                        message += `\nBid Time: ${new Date(bid?.timestamp.toNumber() * 1000).toLocaleString()}`;
+                        message += `\nCheck Room: ${checkRoom}`;
+                        const forceTIF = nearTIF > 245 ? true : false;
+                        if (forceTIF) {
+                            message += `\nForcing TIF: ${nearTIF}`;
                             instructions.push(cancelAllInstr);
+                        } else if (checkRoom) {
+                            let cumulativeToBidPrice = 0;
+                            for (const b of bids) {
+                                // Ignore owner account
+                                if (b.owner.toString() === mangoAccount.publicKey.toString()) {
+                                    break;
+                                }
+                                if (cumulativeToBidPrice > (maxDepth * marketContext.params.room)) {
+                                    break;
+                                }
+                                cumulativeToBidPrice += b.size;
+                            }
+                            message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)}`;
+                            message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+                            if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
+                                message += `\nHas room to cancel.`;
+                                instructions.push(cancelAllInstr);
+                            } else {
+                                message += `\nNo room to cancel.`;
+                                console.log(message);
+                            }
                         } else {
-                            message += `\nNo room to cancel.`;
-                            console.log(message);
+                            message += `\nNo check room needed, just cancel`;
+                            instructions.push(cancelAllInstr);
                         }
-                    } else {
-                        message += `\nNo check room needed, just cancel`;
+                    } else if (bid.price > bidPrice || bid.price > aggBid) {
+                        // Case 2: Bid is not good - might be hang
+                        message += `\nCase 2: Bid is not good - might be hang`;
+                        message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
+                        message += `\nBid Price: ${bidPrice.toFixed(priceLotsDecimals)} - Bidding: ${bid.price.toFixed(priceLotsDecimals)} - bidCharge: ${(bidCharge * 100).toFixed(2)}%`;
                         instructions.push(cancelAllInstr);
                     }
-                } else if (bid.price > bidPrice || bid.price > aggBid) {
-                    // Case 2: Bid is not good - might be hang
-                    message += `\nCase 2: Bid is not good - might be hang`;
-                    message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
-                    message += `\nBid Price: ${bidPrice.toFixed(priceLotsDecimals)} - Bidding: ${bid.price.toFixed(priceLotsDecimals)} - bidCharge: ${(bidCharge * 100).toFixed(2)}%`;
-                    instructions.push(cancelAllInstr);
                 }
             }
-        }
-    } else {
-        let askCount = 1;
-        for (const ask of asks) {
-            if (askCount === 0) break;
-            askCount++;
-            if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
-                askCount = 0;
-                const nearTIF = currentTimeInSecond - ask?.timestamp.toNumber();
-                if (nearTIF > timeInForce) {
-                    const checkRoom = marketContext.params.checkRoom;
-                    // Case 1: On OrderBook too long
-                    message += `\nCase 1: On OrderBook too long - TIF`;
-                    message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
-                    message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
-                    message += `\nCheck Room: ${checkRoom}`;
-                    const forceTIF = nearTIF > 245 ? true : false;
-                    if (forceTIF) {
-                        message += `\nForcing TIF: ${nearTIF}`;
-                        instructions.push(cancelAllInstr);
-                    } else if (checkRoom) {
-                        let cumulativeToAskPrice = 0;
-                        for (const a of asks) {
-                            // Ignore owner account
-                            if (a.owner.toString() === mangoAccount.publicKey.toString()) {
-                                break;
-                            }
-                            if (cumulativeToAskPrice > (maxDepth * marketContext.params.room)) {
-                                break;
-                            }
-                            cumulativeToAskPrice += a.size;
-                        }
-                        message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)}`;
-                        message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
-                        if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
-                            message += `\nHas room to cancel.`;
+        } else {
+            let askCount = 1;
+            for (const ask of asks) {
+                if (askCount === 0) break;
+                askCount++;
+                if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
+                    askCount = 0;
+                    const nearTIF = currentTimeInSecond - ask?.timestamp.toNumber();
+                    if (nearTIF > timeInForce) {
+                        const checkRoom = marketContext.params.checkRoom;
+                        // Case 1: On OrderBook too long
+                        message += `\nCase 1: On OrderBook too long - TIF`;
+                        message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
+                        message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
+                        message += `\nCheck Room: ${checkRoom}`;
+                        const forceTIF = nearTIF > 245 ? true : false;
+                        if (forceTIF) {
+                            message += `\nForcing TIF: ${nearTIF}`;
                             instructions.push(cancelAllInstr);
+                        } else if (checkRoom) {
+                            let cumulativeToAskPrice = 0;
+                            for (const a of asks) {
+                                // Ignore owner account
+                                if (a.owner.toString() === mangoAccount.publicKey.toString()) {
+                                    break;
+                                }
+                                if (cumulativeToAskPrice > (maxDepth * marketContext.params.room)) {
+                                    break;
+                                }
+                                cumulativeToAskPrice += a.size;
+                            }
+                            message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)}`;
+                            message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+                            if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
+                                message += `\nHas room to cancel.`;
+                                instructions.push(cancelAllInstr);
+                            } else {
+                                message += `\nNo room to cancel.`;
+                                console.log(message);
+                            }
                         } else {
-                            message += `\nNo room to cancel.`;
-                            console.log(message);
+                            message += `\nNo check room needed, just cancel`;
+                            instructions.push(cancelAllInstr);
                         }
-                    } else {
-                        message += `\nNo check room needed, just cancel`;
+                    } else if (ask.price < askPrice || ask.price < aggAsk) {
+                        // Case 2: Ask is not good - might be hang
+                        message += `\nCase 2: Ask is not good - might be hang`;
+                        message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
+                        message += `\nAsk Price: ${askPrice.toFixed(priceLotsDecimals)} - Asking: ${ask.price.toFixed(priceLotsDecimals)} - askCharge: ${(askCharge * 100).toFixed(2)}%`;
                         instructions.push(cancelAllInstr);
                     }
-                } else if (ask.price < askPrice || ask.price < aggAsk) {
-                    // Case 2: Ask is not good - might be hang
-                    message += `\nCase 2: Ask is not good - might be hang`;
-                    message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
-                    message += `\nAsk Price: ${askPrice.toFixed(priceLotsDecimals)} - Asking: ${ask.price.toFixed(priceLotsDecimals)} - askCharge: ${(askCharge * 100).toFixed(2)}%`;
-                    instructions.push(cancelAllInstr);
                 }
             }
         }
@@ -840,13 +842,13 @@ async function onExit(
         );
         tx.add(cancelAllInstr);
         if (tx.instructions.length === params.batch) {
-            // txProms.push(client.sendTransaction(tx, payer, []));
+            txProms.push(client.sendTransaction(tx, payer, []));
             tx = new Transaction();
         }
     }
 
     if (tx.instructions.length) {
-        // txProms.push(client.sendTransaction(tx, payer, []));
+        txProms.push(client.sendTransaction(tx, payer, []));
     }
     const txids = await Promise.all(txProms);
     txids.forEach((txid) => {
