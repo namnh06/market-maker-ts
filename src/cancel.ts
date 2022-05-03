@@ -179,6 +179,7 @@ async function loadAccountAndMarketState(
                 ai.publicKey,
                 marketContexts[i].market,
                 BookSideLayout.decode(ai.accountInfo.data),
+                true
             );
         });
 
@@ -193,6 +194,7 @@ async function loadAccountAndMarketState(
                 ai.publicKey,
                 marketContexts[i].market,
                 BookSideLayout.decode(ai.accountInfo.data),
+                true
             );
         });
 
@@ -385,9 +387,9 @@ async function mainCancel() {
                         j++;
                         if (j === params.batch) {
                             if (averageTPS < params.averageTPS) {
-                                sendDupTxs(client, tx, [], 10);
+                                // sendDupTxs(client, tx, [], 10);
                             } else {
-                                client.sendTransaction(tx, payer, [], null);
+                                // client.sendTransaction(tx, payer, [], null);
                             }
                             tx = new Transaction();
                             j = 0;
@@ -397,9 +399,9 @@ async function mainCancel() {
             }
             if (tx.instructions.length) {
                 if (averageTPS < params.averageTPS) {
-                    sendDupTxs(client, tx, [], 10);
+                    // sendDupTxs(client, tx, [], 10);
                 } else {
-                    client.sendTransaction(tx, payer, [], null);
+                    // client.sendTransaction(tx, payer, [], null);
                 }
             }
         } catch (e) {
@@ -480,6 +482,7 @@ async function listenAccountAndMarketState(
                         ai.publicKey,
                         state.marketContexts[i].market,
                         BookSideLayout.decode(ai.accountInfo.data),
+                        true
                     );
                 });
 
@@ -494,6 +497,7 @@ async function listenAccountAndMarketState(
                         ai.publicKey,
                         state.marketContexts[i].market,
                         BookSideLayout.decode(ai.accountInfo.data),
+                        true
                     );
                 });
 
@@ -538,6 +542,7 @@ function listenState(
                 mc.market.bids,
                 mc.market,
                 BookSideLayout.decode(info.data),
+                true
             );
             mc.lastBookUpdate = getUnixTs();
         });
@@ -546,6 +551,7 @@ function listenState(
                 mc.market.asks,
                 mc.market,
                 BookSideLayout.decode(info.data),
+                true
             );
             mc.lastBookUpdate = getUnixTs();
         });
@@ -607,6 +613,7 @@ function makeMarketUpdateInstructions(
     const aggBid = marketContext.aggBid;
     const aggAsk = marketContext.aggAsk;
     if (aggBid === undefined || aggAsk === undefined) {
+        console.log(`${marketContext.marketName} No Agg Book`);
         return [];
     }
     const fairValue: number = (aggBid + aggAsk) / 2;
@@ -673,31 +680,34 @@ function makeMarketUpdateInstructions(
     );
 
     const currentTimeInSecond = Date.now() / 1000;
-    const timeToLive = marketContext.params.timeToLive || 3600;
-    const timeInForce = marketContext.params.tif || 3600;
+    const timeInForce = params.tif || 255;
     message += `\nBids Count: ${bids.leafCount} - Asks Count: ${asks.leafCount}`;
     const maxDepth = market.liquidityMiningInfo.maxDepthBps.toNumber() * baseLotsToUiConvertor;
-    if (bids.leafCount < asks.leafCount) {
-        let bidCount = 0;
+    const openOrders = mangoAccount
+        .getPerpOpenOrders()
+        .filter((o) => o.marketIndex === marketIndex);
+    const bidsLeafCount = bids.leafCount > 100 ? 100 : bids.leafCount;
+    const asksLeafCount = asks.leafCount > 100 ? 100 : asks.leafCount;
+    if (bidsLeafCount <= asksLeafCount) {
+        let bidCount: number = 1;
         for (const bid of bids) {
-            if (bidCount === 20) break;
+            if (bidCount === 0) break;
             bidCount++;
             if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
-                bidCount = 20;
-                const nearTIF = currentTimeInSecond - bid?.timestamp.toNumber() + 30;
-                const diffInSeconds = currentTimeInSecond - bid?.timestamp.toNumber();
+                bidCount = 0;
+                const nearTIF = currentTimeInSecond - bid?.timestamp.toNumber();
                 if (nearTIF > timeInForce) {
-                    message += `\nCase 0: Near time in force - tif: ${timeInForce}`;
-                    message += `\nNear time in force, has to cancel`;
-                    instructions.push(cancelAllInstr);
-                } else if (diffInSeconds > timeToLive) {
                     // Case 1: On OrderBook too long
                     const checkRoom = marketContext.params.checkRoom;
-                    message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
+                    message += `\nCase 1: On OrderBook too long - TIF}`;
                     message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
                     message += `\nBid Time: ${new Date(bid?.timestamp.toNumber() * 1000).toLocaleString()}`;
-                    message += `\nCheck Room: ${checkRoom}`
-                    if (checkRoom === true) {
+                    message += `\nCheck Room: ${checkRoom}`;
+                    const forceTIF = nearTIF > 245 ? true : false;
+                    if (forceTIF) {
+                        message += `\nForcing TIF: ${nearTIF}`;
+                        instructions.push(cancelAllInstr);
+                    } else if (checkRoom) {
                         let cumulativeToBidPrice = 0;
                         for (const b of bids) {
                             // Ignore owner account
@@ -709,7 +719,8 @@ function makeMarketUpdateInstructions(
                             }
                             cumulativeToBidPrice += b.size;
                         }
-                        message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+                        message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)}`;
+                        message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
                         if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
                             message += `\nHas room to cancel.`;
                             instructions.push(cancelAllInstr);
@@ -718,6 +729,7 @@ function makeMarketUpdateInstructions(
                             console.log(message);
                         }
                     } else {
+                        message += `\nNo check room needed, just cancel`;
                         instructions.push(cancelAllInstr);
                     }
                 } else if (bid.price > bidPrice || bid.price > aggBid) {
@@ -730,26 +742,25 @@ function makeMarketUpdateInstructions(
             }
         }
     } else {
-        let askCount = 0;
+        let askCount = 1;
         for (const ask of asks) {
-            if (askCount === 20) break;
+            if (askCount === 0) break;
             askCount++;
             if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
-                askCount = 20;
-
-                const nearTIF = currentTimeInSecond - ask?.timestamp.toNumber() + 30;
-                const diffInSeconds = currentTimeInSecond - ask?.timestamp.toNumber();
+                askCount = 0;
+                const nearTIF = currentTimeInSecond - ask?.timestamp.toNumber();
                 if (nearTIF > timeInForce) {
-                    message += `\nCase 0: Near time in force - tif: ${timeInForce}`;
-                    message += `\nNear time in force, has to cancel`;
-                    instructions.push(cancelAllInstr);
-                } else if (diffInSeconds > timeToLive) {
                     const checkRoom = marketContext.params.checkRoom;
                     // Case 1: On OrderBook too long
-                    message += `\nCase 1: On OrderBook too long - time to live: ${timeToLive}`;
+                    message += `\nCase 1: On OrderBook too long - TIF`;
                     message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
                     message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
-                    if (checkRoom === true) {
+                    message += `\nCheck Room: ${checkRoom}`;
+                    const forceTIF = nearTIF > 245 ? true : false;
+                    if (forceTIF) {
+                        message += `\nForcing TIF: ${nearTIF}`;
+                        instructions.push(cancelAllInstr);
+                    } else if (checkRoom) {
                         let cumulativeToAskPrice = 0;
                         for (const a of asks) {
                             // Ignore owner account
@@ -761,7 +772,8 @@ function makeMarketUpdateInstructions(
                             }
                             cumulativeToAskPrice += a.size;
                         }
-                        message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)} - Max Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+                        message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)}`;
+                        message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
                         if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
                             message += `\nHas room to cancel.`;
                             instructions.push(cancelAllInstr);
@@ -770,6 +782,7 @@ function makeMarketUpdateInstructions(
                             console.log(message);
                         }
                     } else {
+                        message += `\nNo check room needed, just cancel`;
                         instructions.push(cancelAllInstr);
                     }
                 } else if (ask.price < askPrice || ask.price < aggAsk) {
