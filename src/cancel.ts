@@ -680,7 +680,8 @@ function makeMarketUpdateInstructions(
     );
 
     const currentTimeInSecond = Date.now() / 1000;
-    const timeInForce = params.tif || 255;
+    const timeInForce = marketContext.params.tif || 200;
+    const timeToLive = marketContext.params.timeToLive || 900;
     message += `\nBids Count: ${bids.leafCount} - Asks Count: ${asks.leafCount}`;
     const maxDepth = market.liquidityMiningInfo.maxDepthBps.toNumber() * baseLotsToUiConvertor;
     const openOrders = mangoAccount
@@ -697,7 +698,8 @@ function makeMarketUpdateInstructions(
                 if (bid?.owner.toString() === mangoAccount.publicKey.toString()) {
                     bidCount = 0;
                     const nearTIF = currentTimeInSecond - bid?.timestamp.toNumber();
-                    if (nearTIF > timeInForce) {
+                    const diffInSeconds = currentTimeInSecond - bid?.timestamp.toNumber();
+                    if (marketContext.params.tif !== undefined && nearTIF > timeInForce) {
                         // Case 1: On OrderBook too long
                         const checkRoom = marketContext.params.checkRoom;
                         message += `\nCase 1: On OrderBook too long - TIF`;
@@ -723,19 +725,50 @@ function makeMarketUpdateInstructions(
                             message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)}`;
                             message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
                             if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
-                                message += `\nHas room to cancel.`;
+                                message += `\nTIF - Has room to cancel.`;
                                 instructions.push(cancelAllInstr);
                             } else {
-                                message += `\nNo room to cancel.`;
+                                message += `\nTIF - No room to cancel.`;
                                 console.log(message);
                             }
                         } else {
-                            message += `\nNo check room needed, just cancel`;
+                            message += `\nTIF - No check room needed, just cancel`;
+                            instructions.push(cancelAllInstr);
+                        }
+                    } else if (marketContext.params.timeToLive !== undefined && diffInSeconds > timeToLive) {
+                        const checkRoom = marketContext.params.checkRoom;
+                        message += `\nCase 2: On OrderBook too long - TTL: ${timeToLive}`;
+                        message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
+                        message += `\nBid Time: ${new Date(bid?.timestamp.toNumber() * 1000).toLocaleString()}`;
+                        message += `\nCheck Room: ${checkRoom}`
+                        if (checkRoom === true) {
+                            let cumulativeToBidPrice = 0;
+                            for (const b of bids) {
+                                // Ignore owner account
+                                if (b.owner.toString() === mangoAccount.publicKey.toString()) {
+                                    break;
+                                }
+                                if (cumulativeToBidPrice > (maxDepth * marketContext.params.room)) {
+                                    break;
+                                }
+                                cumulativeToBidPrice += b.size;
+                            }
+                            message += `\nCumulative To Bid Price: ${cumulativeToBidPrice.toFixed(baseLotsDecimals)}`;
+                            message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+                            if (cumulativeToBidPrice < (maxDepth * marketContext.params.room)) {
+                                message += `\nTTL - Has room to cancel.`;
+                                instructions.push(cancelAllInstr);
+                            } else {
+                                message += `\nTTL - No room to cancel.`;
+                                console.log(message);
+                            }
+                        } else {
+                            message += `\nTTL - No check room needed, just cancel`;
                             instructions.push(cancelAllInstr);
                         }
                     } else if (bid.price > bidPrice || bid.price > aggBid) {
-                        // Case 2: Bid is not good - might be hang
-                        message += `\nCase 2: Bid is not good - might be hang`;
+                        // Case 3: Bid is not good - might be hang
+                        message += `\nCase 3: Bid is not good - might be hang`;
                         message += `\nFair Value: ${fairValue.toFixed(priceLotsDecimals)}`;
                         message += `\nBid Price: ${bidPrice.toFixed(priceLotsDecimals)} - Bidding: ${bid.price.toFixed(priceLotsDecimals)} - bidCharge: ${(bidCharge * 100).toFixed(2)}%`;
                         instructions.push(cancelAllInstr);
@@ -750,9 +783,10 @@ function makeMarketUpdateInstructions(
                 if (ask?.owner.toString() === mangoAccount.publicKey.toString()) {
                     askCount = 0;
                     const nearTIF = currentTimeInSecond - ask?.timestamp.toNumber();
-                    if (nearTIF > timeInForce) {
+                    const diffInSeconds = currentTimeInSecond - ask?.timestamp.toNumber();
+                    if (marketContext.params.tif !== undefined && nearTIF > timeInForce) {
                         const checkRoom = marketContext.params.checkRoom;
-                        // Case 1: On OrderBook too long
+                        // Case 1: On OrderBook too long TIF
                         message += `\nCase 1: On OrderBook too long - TIF`;
                         message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
                         message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
@@ -776,14 +810,45 @@ function makeMarketUpdateInstructions(
                             message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)}`;
                             message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
                             if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
-                                message += `\nHas room to cancel.`;
+                                message += `\nTIF - Has room to cancel.`;
                                 instructions.push(cancelAllInstr);
                             } else {
-                                message += `\nNo room to cancel.`;
+                                message += `\nTIF - No room to cancel.`;
                                 console.log(message);
                             }
                         } else {
-                            message += `\nNo check room needed, just cancel`;
+                            message += `\nTIF - No check room needed, just cancel`;
+                            instructions.push(cancelAllInstr);
+                        }
+                    } else if (marketContext.params.timeToLive !== undefined && diffInSeconds > timeToLive) {
+                        const checkRoom = marketContext.params.checkRoom;
+                        // Case 2: On Order book too long - TTL
+                        message += `\nCase 1: On OrderBook too long - TTL: ${timeToLive}`;
+                        message += `\nCurrent Time: ${new Date(currentTimeInSecond * 1000).toLocaleString()}`;
+                        message += `\nAsk Time: ${new Date(ask?.timestamp.toNumber() * 1000).toLocaleString()}`;
+                        if (checkRoom === true) {
+                            let cumulativeToAskPrice = 0;
+                            for (const a of asks) {
+                                // Ignore owner account
+                                if (a.owner.toString() === mangoAccount.publicKey.toString()) {
+                                    break;
+                                }
+                                if (cumulativeToAskPrice > (maxDepth * marketContext.params.room)) {
+                                    break;
+                                }
+                                cumulativeToAskPrice += a.size;
+                            }
+                            message += `\nCumulative To Ask Price: ${cumulativeToAskPrice.toFixed(baseLotsDecimals)}`;
+                            message += `\nMax Depth: ${maxDepth} - Accept: ${maxDepth * marketContext.params.room}`;
+                            if (cumulativeToAskPrice < (maxDepth * marketContext.params.room)) {
+                                message += `\nTTL - Has room to cancel.`;
+                                instructions.push(cancelAllInstr);
+                            } else {
+                                message += `\nTTL - No room to cancel.`;
+                                console.log(message);
+                            }
+                        } else {
+                            message += `\nTTL - No check room needed, just cancel`;
                             instructions.push(cancelAllInstr);
                         }
                     } else if (ask.price < askPrice || ask.price < aggAsk) {
