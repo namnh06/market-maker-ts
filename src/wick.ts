@@ -50,6 +50,7 @@ import {
 import { findProgramAddressSync } from '@project-serum/anchor/dist/cjs/utils/pubkey';
 
 declare var lastFairValue;
+declare var secondLastFairValue;
 
 const paramsFileName = process.env.PARAMS || 'default.json';
 const params = JSON.parse(
@@ -590,13 +591,19 @@ function makeMarketUpdateInstructions(
     if (globalThis.lastFairValue === undefined) {
         globalThis.lastFairValue = [];
     }
+    if (globalThis.secondLastFairValue === undefined) {
+        globalThis.secondLastFairValue = [];
+    }
 
     if (globalThis.lastFairValue[marketName] === undefined) {
         globalThis.lastFairValue[marketName] = fairValue;
     }
+    if (globalThis.secondLastFairValue[marketName] === undefined) {
+        globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
+    }
 
-    const volatility = Math.abs(fairValue - globalThis.lastFairValue[marketName]);
     const volatilityPercentage = percentageVolatility(fairValue, globalThis.lastFairValue[marketName]);
+    const secondVolatilityPercentage = percentageVolatility(fairValue, globalThis.secondLastFairValue[marketName]);
 
     const aggSpread: number = (aggAsk - aggBid) / fairValue;
     const perpAccount = mangoAccount.perpAccounts[marketIndex];
@@ -605,23 +612,22 @@ function makeMarketUpdateInstructions(
 
     let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
     let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-    if (averageTPS < 100 || volatilityPercentage > 1) {
+
+    if (averageTPS < 200 || volatilityPercentage > 1 || secondVolatilityPercentage > 1) {
         bidCharge += 0.05;
         askCharge += 0.05;
-    } else if (averageTPS < 500 || volatilityPercentage > 0.5) {
+    } else if (averageTPS < 500 || volatilityPercentage > 0.5 || secondVolatilityPercentage > 0.5) {
         bidCharge += 0.01;
         askCharge += 0.01;
-        console.log(`${marketName} - Average TPS: ${averageTPS} < 500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.5`);
-    } else if (averageTPS < 1000 || volatilityPercentage > 0.3) {
+    } else if (averageTPS < 1000 || volatilityPercentage > 0.3 || secondVolatilityPercentage > 0.3) {
         bidCharge += 0.005;
         askCharge += 0.005;
-        console.log(`${marketName} - Average TPS: ${averageTPS} < 1000 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.3`);
-    } else if (averageTPS < 1500 || volatilityPercentage > 0.2) {
+    } else if (averageTPS < 1500 || volatilityPercentage > 0.2 || secondVolatilityPercentage > 0.2) {
         bidCharge += 0.002;
         askCharge += 0.002;
-        console.log(`${marketName} - Average TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} > 0.2`);
     }
     globalThis.lastFairValue[marketName] = fairValue;
+    globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
     const requoteThresh = marketContext.params.requoteThresh;
     const size = quoteSize / fairValue;
     let bidPrice = fairValue * (1 - bidCharge);
@@ -825,13 +831,13 @@ async function onExit(
         );
         tx.add(cancelAllInstr);
         if (tx.instructions.length === params.batch) {
-            txProms.push(client.sendTransaction(tx, payer, []));
+            // txProms.push(client.sendTransaction(tx, payer, []));
             tx = new Transaction();
         }
     }
 
     if (tx.instructions.length) {
-        txProms.push(client.sendTransaction(tx, payer, []));
+        // txProms.push(client.sendTransaction(tx, payer, []));
     }
     const txids = await Promise.all(txProms);
     txids.forEach((txid) => {
