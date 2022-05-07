@@ -626,8 +626,9 @@ function makeMarketUpdateInstructions(
         bidCharge += 0.002;
         askCharge += 0.002;
     }
-    globalThis.lastFairValue[marketName] = fairValue;
     globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
+    globalThis.lastFairValue[marketName] = fairValue;
+
     const requoteThresh = marketContext.params.requoteThresh;
     const size = quoteSize / fairValue;
     let bidPrice = fairValue * (1 - bidCharge);

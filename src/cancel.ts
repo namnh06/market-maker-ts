@@ -656,8 +656,8 @@ function makeMarketUpdateInstructions(
         askCharge += 0.001;
         message += `\nAverage TPS: ${averageTPS} < 1500 || Volatility: ${volatilityPercentage.toFixed(2)} || ${secondVolatilityPercentage.toFixed(2)} > 0.2%`;
     }
-    globalThis.lastFairValue[marketName] = fairValue;
     globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
+    globalThis.lastFairValue[marketName] = fairValue;
     let bidPrice = fairValue * (1 - bidCharge);
     let askPrice = fairValue * (1 + askCharge);
 
