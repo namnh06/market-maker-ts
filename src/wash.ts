@@ -376,7 +376,6 @@ async function washTrade() {
                     state.cache,
                     mangoAccount,
                     marketContexts[i],
-                    averageTPS,
                     telegramBot
                 );
                 if (instrSet.length > 0) {
@@ -556,7 +555,6 @@ function makeMarketUpdateInstructions(
     cache: MangoCache,
     mangoAccount: MangoAccount,
     marketContext: MarketContext,
-    averageTPS: number,
     telegramBot
 ): TransactionInstruction[] {
     // Right now only uses the perp
@@ -584,26 +582,14 @@ function makeMarketUpdateInstructions(
         // Start building the transaction
         const instructions: TransactionInstruction[] = [];
 
-        const bids = marketContext.bids;
-        const asks = marketContext.asks;
-        const bestBid = bids.getBest();
-        const bestAsk = asks.getBest();
         const acceptableBPS: number = (marketContext.params.acceptableBPS || 20) + (aggSpread / 2);
         const acceptableBPSToNumber: number = fairValue * (acceptableBPS / 10000);
 
-        const forceTrade = marketContext.params.forceTrade || false;
         // Start check bid and ask
         message += `\nAccount: ${mangoAccount.name} - ${mangoAccount.publicKey.toString()}`
-        if (
-            basePos > 0 &&
-            bestBid !== undefined &&
-            bestBid.owner.toString() !== mangoAccount.publicKey.toString() &&
-            (averageTPS < params.averageTPS || forceTrade)
-        ) {
+        if (basePos > 0) {
             const bidAcceptablePrice = fairValue - acceptableBPSToNumber;
-            message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)} - ` +
-                `bidAcceptablePrice: ${bidAcceptablePrice.toFixed(priceLotsDecimals)} - ` +
-                `bestBidPrice: ${bestBid.price.toFixed(priceLotsDecimals)}`;
+            message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
             const takerSize: number = basePos;
             const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
                 bidAcceptablePrice,
@@ -631,11 +617,6 @@ function makeMarketUpdateInstructions(
             );
             message += `\nSelling ...`;
             message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bidAcceptablePrice} `;
-            if (bestBid.price > bidAcceptablePrice) {
-                message += `\nCounter party owner ${bestBid.owner.toString()} - price: ${bestBid.price} - size: ${bestBid.size.toFixed(baseLotsDecimals)}`;
-            } else {
-                message += `\nWash Trade - IOC in the air`;
-            }
 
             instructions.push(takerSell);
 
@@ -646,16 +627,9 @@ function makeMarketUpdateInstructions(
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
             }
-        } else if (
-            basePos < 0 &&
-            bestAsk !== undefined &&
-            bestAsk.owner.toString() !== mangoAccount.publicKey.toString() &&
-            (averageTPS < params.averageTPS || forceTrade)
-        ) {
+        } else if (basePos < 0) {
             const askAcceptablePrice = fairValue + acceptableBPSToNumber;
-            message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)} - ` +
-                `askAcceptablePrice: ${askAcceptablePrice.toFixed(priceLotsDecimals)} - ` +
-                `bestAskPrice: ${bestAsk.price.toFixed(priceLotsDecimals)}`;
+            message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
             const takerSize: number = Math.abs(basePos);
 
             const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
@@ -685,11 +659,7 @@ function makeMarketUpdateInstructions(
             );
             message += `\nBuying ...`;
             message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${askAcceptablePrice}`;
-            if (bestAsk.price < askAcceptablePrice) {
-                message += `\nCounter party owner ${bestAsk.owner.toString()} - price: ${bestAsk.price} - size: ${bestAsk.size.toFixed(baseLotsDecimals)}`;
-            } else {
-                message += `\nWash Trade - IOC in the air`;
-            }
+
             instructions.push(takerBuy);
 
             if (globalThis.lastSendTelegram === undefined) {
@@ -699,8 +669,6 @@ function makeMarketUpdateInstructions(
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
             }
-        } else {
-            console.log(`${marketIndex} - basePos: ${basePos} - averageTPS: ${averageTPS} - forceTrade: ${forceTrade} `);
         }
         console.log(message);
         return instructions;

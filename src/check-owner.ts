@@ -134,6 +134,7 @@ async function loadAccountAndMarketState(
                 ai.publicKey,
                 marketContexts[i].market,
                 BookSideLayout.decode(ai.accountInfo.data),
+                true,
             );
         });
 
@@ -147,6 +148,7 @@ async function loadAccountAndMarketState(
                 ai.publicKey,
                 marketContexts[i].market,
                 BookSideLayout.decode(ai.accountInfo.data),
+                true,
             );
         });
 
@@ -228,7 +230,6 @@ async function fullCheckOwner() {
             );
             mangoAccount = state.mangoAccount;
 
-            // console.log(`Current Average TPS: ${averageTPS.toLocaleString()}`);
             let message: string = "";
             for (let i = 0; i < marketContexts.length; i++) {
                 if (marketContexts[i].params.isCheck) {
@@ -248,10 +249,6 @@ async function fullCheckOwner() {
             console.log(e);
         } finally {
             let timeSleep = control.interval;
-            // console.log(
-            // `${new Date().toUTCString()} sleeping for ${timeSleep / 1000}s`,
-            // );
-            // console.log(`---END---`);
             await sleep(timeSleep);
         }
     }
@@ -266,10 +263,7 @@ function checkOwner(
 ): string {
     let marketMessage: string = "";
     // Right now only uses the perp
-    const marketIndex = marketContext.marketIndex;
-    const market = marketContext.market;
-    // const priceLotsToUiConvertor = market.priceLotsToUiConvertor;
-    // console.log(priceLotsToUiConvertor);
+    console.log(`--- ${marketContext.marketName} ---`)
     const bids = marketContext.bids;
     let bidCount = 0;
     // for (const bid of bids) {
@@ -286,10 +280,10 @@ function checkOwner(
     let askCount = 0;
     for (const ask of asks) {
         askCount++;
-        if (askCount > 20) {
+        if (askCount > 30) {
             break;
         }
-        if (ask.size > 9) {
+        if (ask.size > 50) {
             console.log(`owner: ${ask.owner} - size: ${ask.size} - price: ${ask.price}`);
         }
     }
