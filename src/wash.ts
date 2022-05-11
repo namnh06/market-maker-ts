@@ -601,45 +601,39 @@ function makeMarketUpdateInstructions(
             (averageTPS < params.averageTPS || forceTrade)
         ) {
             const bidAcceptablePrice = fairValue - acceptableBPSToNumber;
-            const isBestBidAcceptable: boolean = bestBid.price > bidAcceptablePrice;
             message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)} - ` +
                 `bidAcceptablePrice: ${bidAcceptablePrice.toFixed(priceLotsDecimals)} - ` +
-                `bestBidPrice: ${bestBid.price.toFixed(priceLotsDecimals)} - ` +
-                `isBestBidAcceptable: ${isBestBidAcceptable}`;
+                `bestBidPrice: ${bestBid.price.toFixed(priceLotsDecimals)}`;
             const takerSize: number = basePos;
+            const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
+                bidAcceptablePrice,
+                takerSize,
+            );
+            const takerSell = makePlacePerpOrder2Instruction(
+                mangoProgramId,
+                group.publicKey,
+                mangoAccount.publicKey,
+                payer.publicKey,
+                cache.publicKey,
+                market.publicKey,
+                market.bids,
+                market.asks,
+                market.eventQueue,
+                mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                bestBid.priceLots,
+                nativeBidSize,
+                I64_MAX_BN,
+                new BN(Date.now()),
+                'sell',
+                new BN(20),
+                'ioc',
+                true
+            );
+            message += `\nSelling ...`;
+            message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bestBid.price} `;
+            message += `\nCounter party owner ${bestBid.owner.toString()} - size: ${bestBid.size.toFixed(baseLotsDecimals)}`;
+            instructions.push(takerSell);
 
-            if (isBestBidAcceptable) {
-                const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
-                    0,
-                    takerSize,
-                );
-                const takerSell = makePlacePerpOrder2Instruction(
-                    mangoProgramId,
-                    group.publicKey,
-                    mangoAccount.publicKey,
-                    payer.publicKey,
-                    cache.publicKey,
-                    market.publicKey,
-                    market.bids,
-                    market.asks,
-                    market.eventQueue,
-                    mangoAccount.getOpenOrdersKeysInBasketPacked(),
-                    bestBid.priceLots,
-                    nativeBidSize,
-                    I64_MAX_BN,
-                    new BN(Date.now()),
-                    'sell',
-                    new BN(20),
-                    'ioc',
-                    true
-                );
-                message += `\nSelling ...`;
-                message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bestBid.price} `;
-                message += `\nCounter party owner ${bestBid.owner.toString()} - size: ${bestBid.size.toFixed(baseLotsDecimals)}`;
-                instructions.push(takerSell);
-            } else {
-                message += `\nDo nothing due to the price is not good`;
-            }
             if (globalThis.lastSendTelegram === undefined) {
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
@@ -654,45 +648,41 @@ function makeMarketUpdateInstructions(
             (averageTPS < params.averageTPS || forceTrade)
         ) {
             const askAcceptablePrice = fairValue + acceptableBPSToNumber;
-            const isBestAskAcceptable: boolean = bestAsk.price < askAcceptablePrice;
             message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)} - ` +
                 `askAcceptablePrice: ${askAcceptablePrice.toFixed(priceLotsDecimals)} - ` +
-                `bestAskPrice: ${bestAsk.price.toFixed(priceLotsDecimals)} - ` +
-                `isBestAskAcceptable: ${isBestAskAcceptable} `;
+                `bestAskPrice: ${bestAsk.price.toFixed(priceLotsDecimals)}`;
             const takerSize: number = Math.abs(basePos);
-            if (isBestAskAcceptable) {
-                const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
-                    0,
-                    takerSize,
-                );
 
-                const takerBuy = makePlacePerpOrder2Instruction(
-                    mangoProgramId,
-                    group.publicKey,
-                    mangoAccount.publicKey,
-                    payer.publicKey,
-                    cache.publicKey,
-                    market.publicKey,
-                    market.bids,
-                    market.asks,
-                    market.eventQueue,
-                    mangoAccount.getOpenOrdersKeysInBasketPacked(),
-                    bestAsk.priceLots,
-                    nativeAskSize,
-                    I64_MAX_BN,
-                    new BN(Date.now()),
-                    'buy',
-                    new BN(20),
-                    'ioc',
-                    true
-                );
-                message += `\nBuying ...`;
-                message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${bestAsk.price} `;
-                message += `\nCounter party owner ${bestAsk.owner.toString()} - size: ${bestAsk.size.toFixed(baseLotsDecimals)}`;
-                instructions.push(takerBuy);
-            } else {
-                message += `\nDo nothing due to the price is not good`;
-            }
+            const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
+                askAcceptablePrice,
+                takerSize,
+            );
+
+            const takerBuy = makePlacePerpOrder2Instruction(
+                mangoProgramId,
+                group.publicKey,
+                mangoAccount.publicKey,
+                payer.publicKey,
+                cache.publicKey,
+                market.publicKey,
+                market.bids,
+                market.asks,
+                market.eventQueue,
+                mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                bestAsk.priceLots,
+                nativeAskSize,
+                I64_MAX_BN,
+                new BN(Date.now()),
+                'buy',
+                new BN(20),
+                'ioc',
+                true
+            );
+            message += `\nBuying ...`;
+            message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${bestAsk.price} `;
+            message += `\nCounter party owner ${bestAsk.owner.toString()} - size: ${bestAsk.size.toFixed(baseLotsDecimals)}`;
+            instructions.push(takerBuy);
+
             if (globalThis.lastSendTelegram === undefined) {
                 telegramBot.telegram.sendMessage(telegramChannelId, message);
                 globalThis.lastSendTelegram = Date.now() / 1000;
