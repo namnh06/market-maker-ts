@@ -630,8 +630,13 @@ function makeMarketUpdateInstructions(
                 true
             );
             message += `\nSelling ...`;
-            message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bestBid.price} `;
-            message += `\nCounter party owner ${bestBid.owner.toString()} - size: ${bestBid.size.toFixed(baseLotsDecimals)}`;
+            message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bidAcceptablePrice} `;
+            if (bestBid.price > bidAcceptablePrice) {
+                message += `\nCounter party owner ${bestBid.owner.toString()} - price: ${bestBid.price} - size: ${bestBid.size.toFixed(baseLotsDecimals)}`;
+            } else {
+                message += `\nWash Trade - IOC in the air`;
+            }
+
             instructions.push(takerSell);
 
             if (globalThis.lastSendTelegram === undefined) {
@@ -679,8 +684,12 @@ function makeMarketUpdateInstructions(
                 true
             );
             message += `\nBuying ...`;
-            message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${bestAsk.price} `;
-            message += `\nCounter party owner ${bestAsk.owner.toString()} - size: ${bestAsk.size.toFixed(baseLotsDecimals)}`;
+            message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${askAcceptablePrice}`;
+            if (bestAsk.price < askAcceptablePrice) {
+                message += `\nCounter party owner ${bestAsk.owner.toString()} - price: ${bestAsk.price} - size: ${bestAsk.size.toFixed(baseLotsDecimals)}`;
+            } else {
+                message += `\nWash Trade - IOC in the air`;
+            }
             instructions.push(takerBuy);
 
             if (globalThis.lastSendTelegram === undefined) {
