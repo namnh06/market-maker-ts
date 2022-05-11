@@ -706,20 +706,17 @@ function makeMarketUpdateInstructions(
             Math.round(getUnixTs() * 1000),
         ),
     ];
-
+    const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
+        mangoProgramId,
+        group.publicKey,
+        mangoAccount.publicKey,
+        payer.publicKey,
+        market.publicKey,
+        market.bids,
+        market.asks,
+        new BN(20),
+    );
     if (moveOrders) {
-        // cancel all, requote
-        const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
-            mangoProgramId,
-            group.publicKey,
-            mangoAccount.publicKey,
-            payer.publicKey,
-            market.publicKey,
-            market.bids,
-            market.asks,
-            new BN(20),
-        );
-
         const expiryTimestamp =
             marketContext.params.tif !== undefined
                 ? new BN((Date.now() / 1000) + 255)
@@ -796,6 +793,9 @@ function makeMarketUpdateInstructions(
         // );
     }
 
+    if (Math.abs(basePos) >= size) {
+        instructions.push(cancelAllInstr);
+    }
     // if instruction is only the sequence enforcement, then just send empty
     if (instructions.length === 1) {
         return [];
