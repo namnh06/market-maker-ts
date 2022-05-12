@@ -356,7 +356,7 @@ async function fullMarketMaker() {
                     .reduce((a, b) => a + b, 0) / 3
             );
             mangoAccount = state.mangoAccount;
-
+            console.log(`Current TPS: ${averageTPS}`);
             let j = 0;
             let tx = new Transaction();
             for (let i = 0; i < marketContexts.length; i++) {
@@ -389,9 +389,9 @@ async function fullMarketMaker() {
         } catch (e) {
             console.log(e);
         } finally {
-            // console.log(
-            //   `${new Date().toUTCString()} sleeping for ${control.interval / 1000}s`,
-            // );
+            console.log(
+                `${new Date().toUTCString()} sleeping for ${control.interval / 1000}s`,
+            );
             await sleep(control.interval);
         }
     }
@@ -616,15 +616,15 @@ function makeMarketUpdateInstructions(
     if (averageTPS < 200 || volatilityPercentage > 1 || secondVolatilityPercentage > 1) {
         bidCharge += 0.5;
         askCharge += 0.5;
-    } else if (averageTPS < 500 || volatilityPercentage > 0.5 || secondVolatilityPercentage > 0.5) {
+    } else if (averageTPS < 500 || volatilityPercentage > 0.8 || secondVolatilityPercentage > 0.8) {
         bidCharge += 0.2;
         askCharge += 0.2;
-    } else if (averageTPS < 1000 || volatilityPercentage > 0.3 || secondVolatilityPercentage > 0.3) {
-        bidCharge += 0.01;
-        askCharge += 0.01;
+    } else if (averageTPS < 1000 || volatilityPercentage > 0.5 || secondVolatilityPercentage > 0.5) {
+        bidCharge += 0.05;
+        askCharge += 0.05;
     } else if (averageTPS < 1500 || volatilityPercentage > 0.2 || secondVolatilityPercentage > 0.2) {
-        bidCharge += 0.005;
-        askCharge += 0.005;
+        bidCharge += 0.006;
+        askCharge += 0.006;
     }
     globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
     globalThis.lastFairValue[marketName] = fairValue;
@@ -769,14 +769,14 @@ function makeMarketUpdateInstructions(
         );
         instructions.push(cancelAllInstr);
         const posAsTradeSizes = basePos / size;
-        if (posAsTradeSizes < 1) {
+        if (posAsTradeSizes < 1 && bidPrice >= 0) {
             instructions.push(placeBidInstr);
         }
         if (posAsTradeSizes > -1) {
             instructions.push(placeAskInstr);
         }
         console.log(
-            `Current TPS: ${averageTPS} - ${marketContext.marketName}`,
+            `${marketContext.marketName} -`,
             `Requoting sentBidPx: ${marketContext.sentBidPrice}`,
             `newBidPx: ${bookAdjBid}`,
             `sentAskPx: ${marketContext.sentAskPrice}`,

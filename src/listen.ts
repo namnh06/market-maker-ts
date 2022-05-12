@@ -113,10 +113,12 @@ async function listenFtxBooks(books: MultiBook[]) {
           book.getQuoteSizedBestAsk(ftxSize || quoteSize),
         ),
       );
-      process.send({ marketName: marketName,
-                     aggBid:     aggBid,
-                     aggAsk:     aggAsk,
-                     ftxMid:     mb.ftxMid });
+      process.send({
+        marketName: marketName,
+        aggBid: aggBid,
+        aggAsk: aggAsk,
+        ftxMid: mb.ftxMid
+      });
     }
   }
 
@@ -135,10 +137,9 @@ async function listenBinanceBooks(books: MultiBook[]) {
     'SRMUSDT',
     'BNBUSDT',
     'AVAXUSDT',
-    'LUNAUSDT',
     'ADAUSDT',
   ];
-  const systemMarketToNativeMarket = function(systemMarket: string) { return `${systemMarket.split('-')[0]}USDT` };
+  const systemMarketToNativeMarket = function (systemMarket: string) { return `${systemMarket.split('-')[0]}USDT` };
   const marketNames = books.map((book) => book.marketName).filter((mn) =>
     binanceList.includes(systemMarketToNativeMarket(mn)),
   );
@@ -180,24 +181,26 @@ async function listenBinanceBooks(books: MultiBook[]) {
           book.getQuoteSizedBestAsk(ftxSize || quoteSize),
         ),
       );
-      process.send({ marketName: marketName,
-                     aggBid:     aggBid,
-                     aggAsk:     aggAsk,
-                     ftxMid:     mb.ftxMid });
+      process.send({
+        marketName: marketName,
+        aggBid: aggBid,
+        aggAsk: aggAsk,
+        ftxMid: mb.ftxMid
+      });
     }
   }
 }
 
 const marketNames = process.argv[2].split(',');
 const books: MultiBook[] = marketNames.map((mn) => {
-    return {
-      marketName: mn,
-      ftxMid: 0,
-      books: {
-        ftx: { book: new TardisBook(), updateTime: 0 },
-        binance: { book: new TardisBook(), updateTime: 0 },
-      },
-    };
+  return {
+    marketName: mn,
+    ftxMid: 0,
+    books: {
+      ftx: { book: new TardisBook(), updateTime: 0 },
+      binance: { book: new TardisBook(), updateTime: 0 },
+    },
+  };
 });
 
 listenFtxBooks(books);
