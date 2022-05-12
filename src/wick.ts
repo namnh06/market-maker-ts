@@ -617,11 +617,11 @@ function makeMarketUpdateInstructions(
         bidCharge += 0.5;
         askCharge += 0.5;
     } else if (averageTPS < 500 || volatilityPercentage > 0.5 || secondVolatilityPercentage > 0.5) {
-        bidCharge += 0.1;
-        askCharge += 0.1;
+        bidCharge += 0.2;
+        askCharge += 0.2;
     } else if (averageTPS < 1000 || volatilityPercentage > 0.3 || secondVolatilityPercentage > 0.3) {
-        bidCharge += 0.05;
-        askCharge += 0.05;
+        bidCharge += 0.01;
+        askCharge += 0.01;
     } else if (averageTPS < 1500 || volatilityPercentage > 0.2 || secondVolatilityPercentage > 0.2) {
         bidCharge += 0.005;
         askCharge += 0.005;
