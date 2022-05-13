@@ -793,9 +793,6 @@ function makeMarketUpdateInstructions(
         // );
     }
 
-    if (Math.abs(basePos) >= size) {
-        instructions.push(cancelAllInstr);
-    }
     // if instruction is only the sequence enforcement, then just send empty
     if (instructions.length === 1) {
         return [];
