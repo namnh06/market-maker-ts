@@ -15,6 +15,7 @@
     "scan": "ts-node src/scan.ts",
     "check-hit": "ts-node src/check-hit.ts",
     "wick": "ts-node src/wick.ts",
+    "hedge": "ts-node src/hedge.ts",
     "ioc": "ts-node src/ioc.ts",
     "check-owner": "ts-node src/check-owner.ts"
   },

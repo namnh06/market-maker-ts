@@ -8,7 +8,8 @@
 6. Insert (private): To insert to the orderbooks with a better strategy
 7. Immediately Or Cancel (private): To check orderbooks and clear the order that too bias in one side
 8. Spam (private): To manupilate the oderbooks & funding rate
-9. Check Owner (private): To check the owners that are in orderbooks
+9. Check Owner: To check the owners that are in orderbooks
+10. Hedging: To hedge 50% perp by spot
 
 Notes: Please read the instructions below, then read code from:
 ```
