@@ -1,0 +1,36 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 60000,
+    "batch": 1,
+    "assets": {
+        "BTC": {
+            "perp": {
+                "isHedge": true,
+                "decimals": 2,
+                "posPercentage": 0.5,
+                "charge": 0.005,
+                "ftxSize": 500000
+            }
+        },
+        "ETH": {
+            "perp": {
+                "isHedge": true,
+                "decimals": 1,
+                "posPercentage": 0.5,
+                "charge": 0.005,
+                "ftxSize": 500000
+            }
+        },
+        "SOL": {
+            "perp": {
+                "isHedge": true,
+                "decimals": 0,
+                "posPercentage": 0.5,
+                "charge": 0.005,
+                "ftxSize": 100000
+            }
+        }
+    }
+}
