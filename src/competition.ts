@@ -650,7 +650,7 @@ function makeMarketUpdateInstructions(
     // TODO use order book to requote if size has changed
 
     let moveOrders = false;
-    if (marketContext.lastBookUpdate >= marketContext.lastOrderUpdate + 2) {
+    if (marketContext.lastBookUpdate >= marketContext.lastOrderUpdate + 3) {
         // if mango book was updated recently, then MangoAccount was also updated
         const openOrders = mangoAccount
             .getPerpOpenOrders()
