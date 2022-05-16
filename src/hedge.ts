@@ -427,7 +427,12 @@ async function makeMarketUpdateInstructions(
 
     const perpAccount = mangoAccount.perpAccounts[marketIndex];
     const posPercentage = marketContext.params.posPercentage || 0.5;
-    const perpBasePos = Number(perpAccount.getBasePositionUi(market).toFixed(decimalNumber)) * posPercentage;
+    let perpBasePos = Number(perpAccount.getBasePositionUi(market).toFixed(decimalNumber)) * posPercentage;
+    if (perpBasePos > 0) {
+        perpBasePos = Math.floor(perpBasePos);
+    } else {
+        perpBasePos = Math.ceil(perpBasePos);
+    }
     const spotBasePos = Number(mangoAccount
         .getUiDeposit(cache.rootBankCache[marketIndex], group, marketIndex)
         .sub(
