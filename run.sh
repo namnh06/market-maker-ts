@@ -28,6 +28,9 @@ then
 elif [ $1 == "--check-owner" ]
 then
     yarn check-owner
+elif [ $1 == "--competition" ]
+then
+    yarn competition
 else
     yarn mm
 fi

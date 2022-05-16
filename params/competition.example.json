@@ -1,0 +1,22 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 3000,
+    "batch": 2,
+    "assets": {
+        "SOL": {
+            "perp": {
+                "tif": 120,
+                "isWick": true,
+                "equity": 500,
+                "sizePerc": 1,
+                "bidCharge": 0.0009,
+                "askCharge": 0.0009,
+                "chargeHit": 0.00015,
+                "requoteThresh": 0.0002,
+                "ftxSize": 100000
+            }
+        }
+    }
+}

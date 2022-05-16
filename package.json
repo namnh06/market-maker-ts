@@ -17,7 +17,8 @@
     "wick": "ts-node src/wick.ts",
     "hedge": "ts-node src/hedge.ts",
     "ioc": "ts-node src/ioc.ts",
-    "check-owner": "ts-node src/check-owner.ts"
+    "check-owner": "ts-node src/check-owner.ts",
+    "competition": "ts-node src/competition.ts"
   },
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
