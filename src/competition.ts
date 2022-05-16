@@ -586,13 +586,15 @@ function makeMarketUpdateInstructions(
 
     const fairValue: number = (aggBid + aggAsk) / 2;
 
-    const aggSpread: number = (aggAsk - aggBid) / fairValue;
+    // const aggSpread: number = (aggAsk - aggBid) / fairValue;
     const perpAccount = mangoAccount.perpAccounts[marketIndex];
     // TODO look at event queue as well for unprocessed fills
     const basePos = perpAccount.getBasePositionUi(market);
 
-    let bidCharge = (marketContext.params.bidCharge || 0.0009) + aggSpread / 2;
-    let askCharge = (marketContext.params.askCharge || 0.0009) + aggSpread / 2;
+    // let bidCharge = (marketContext.params.bidCharge || 0.0009) + aggSpread / 2;
+    let bidCharge = (marketContext.params.bidCharge || 0.0009);
+    // let askCharge = (marketContext.params.askCharge || 0.0009) + aggSpread / 2;
+    let askCharge = (marketContext.params.askCharge || 0.0009);
     const chargeHit = (marketContext.params.chargeHit || 0.00015)
     const requoteThresh = marketContext.params.requoteThresh;
     const size = quoteSize / fairValue;
