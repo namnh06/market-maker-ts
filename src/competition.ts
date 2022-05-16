@@ -583,98 +583,6 @@ function makeMarketUpdateInstructions(
         console.log(`${marketContext.marketName} No Agg Book`);
         return [];
     }
-
-    const fairValue: number = (aggBid + aggAsk) / 2;
-
-    // const aggSpread: number = (aggAsk - aggBid) / fairValue;
-    const perpAccount = mangoAccount.perpAccounts[marketIndex];
-    // TODO look at event queue as well for unprocessed fills
-    const basePos = perpAccount.getBasePositionUi(market);
-
-    // let bidCharge = (marketContext.params.bidCharge || 0.0009) + aggSpread / 2;
-    let bidCharge = (marketContext.params.bidCharge || 0.0009);
-    // let askCharge = (marketContext.params.askCharge || 0.0009) + aggSpread / 2;
-    let askCharge = (marketContext.params.askCharge || 0.0009);
-    const chargeHit = (marketContext.params.chargeHit || 0.00015)
-    const requoteThresh = marketContext.params.requoteThresh;
-    const size = quoteSize / fairValue;
-    if (Math.abs(basePos) > (size / 2)) {
-        if (basePos > 0) {
-            bidCharge = bidCharge + chargeHit;
-            askCharge = askCharge - chargeHit;
-        } else {
-            bidCharge = bidCharge - chargeHit;
-            askCharge = askCharge + chargeHit;
-        }
-
-    }
-    let bidPrice = fairValue * (1 - bidCharge);
-    let askPrice = fairValue * (1 + askCharge);
-
-    // Re-calculate Order Price if too volatility
-    // if (bidPrice > aggBid) {
-    //     bidPrice = aggBid * (1 - bidCharge);
-    // }
-    // if (askPrice < aggAsk) {
-    //     askPrice = aggAsk * (1 + askCharge);
-    // }
-
-    let bidSize = size;
-    let askSize = size;
-    if (basePos !== 0) {
-        if (basePos > 0) {
-            bidSize -= basePos;
-        } else {
-            askSize += basePos;
-        }
-    }
-
-    const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
-        bidPrice,
-        bidSize,
-    );
-    const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
-        askPrice,
-        askSize,
-    );
-
-    const bestBid = bids.getBest();
-    const bestAsk = asks.getBest();
-    const bookAdjBid =
-        bestAsk !== undefined
-            ? BN.min(bestAsk.priceLots.sub(ONE_BN), modelBidPrice)
-            : modelBidPrice;
-    const bookAdjAsk =
-        bestBid !== undefined
-            ? BN.max(bestBid.priceLots.add(ONE_BN), modelAskPrice)
-            : modelAskPrice;
-
-    // TODO use order book to requote if size has changed
-
-    let moveOrders = false;
-    if (marketContext.lastBookUpdate >= marketContext.lastOrderUpdate + 3) {
-        // if mango book was updated recently, then MangoAccount was also updated
-        const openOrders = mangoAccount
-            .getPerpOpenOrders()
-            .filter((o) => o.marketIndex === marketIndex);
-        moveOrders = openOrders.length < 2 || openOrders.length > 2;
-        for (const o of openOrders) {
-            const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
-            moveOrders =
-                moveOrders ||
-                Math.abs(o.price.toNumber() / refPrice.toNumber() - 1) > requoteThresh;
-        }
-    } else {
-        // If order was updated before MangoAccount, then assume that sent order already executed
-        moveOrders =
-            moveOrders ||
-            Math.abs(marketContext.sentBidPrice / bookAdjBid.toNumber() - 1) >
-            requoteThresh ||
-            Math.abs(marketContext.sentAskPrice / bookAdjAsk.toNumber() - 1) >
-            requoteThresh ||
-            (marketContext.params.tif !== undefined && marketContext.lastOrderUpdate + marketContext.params.tif < getUnixTs());
-    }
-
     // Start building the transaction
     const instructions: TransactionInstruction[] = [
         makeCheckAndSetSequenceNumberInstruction(
@@ -683,6 +591,7 @@ function makeMarketUpdateInstructions(
             Math.round(getUnixTs() * 1000),
         ),
     ];
+
     const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
         mangoProgramId,
         group.publicKey,
@@ -693,81 +602,167 @@ function makeMarketUpdateInstructions(
         market.asks,
         new BN(20),
     );
-    if (moveOrders) {
-        const expiryTimestamp =
-            marketContext.params.tif !== undefined
-                ? new BN((Date.now() / 1000) + 255)
-                : new BN(0);
 
-        const placeBidInstr = makePlacePerpOrder2Instruction(
-            mangoProgramId,
-            group.publicKey,
-            mangoAccount.publicKey,
-            payer.publicKey,
-            cache.publicKey,
-            market.publicKey,
-            market.bids,
-            market.asks,
-            market.eventQueue,
-            mangoAccount.getOpenOrdersKeysInBasketPacked(),
-            bookAdjBid,
-            nativeBidSize,
-            I64_MAX_BN,
-            new BN(Date.now()),
-            'buy',
-            new BN(20),
-            'postOnlySlide',
-            false,
-            undefined,
-            expiryTimestamp
+    const openOrders = mangoAccount
+        .getPerpOpenOrders()
+        .filter((o) => o.marketIndex === marketIndex);
+    if (averageTPS > 1200) {
+        const fairValue: number = (aggBid + aggAsk) / 2;
+        const perpAccount = mangoAccount.perpAccounts[marketIndex];
+        const basePos = perpAccount.getBasePositionUi(market);
+        let bidCharge = (marketContext.params.bidCharge || 0.0004);
+        let askCharge = (marketContext.params.askCharge || 0.0004);
+        const chargeHit = (marketContext.params.chargeHit || 0.00015)
+        const requoteThresh = marketContext.params.requoteThresh;
+        const size = quoteSize / fairValue;
+        if (Math.abs(basePos) > (size / 2)) {
+            if (basePos > 0) {
+                bidCharge = bidCharge + chargeHit;
+                askCharge = askCharge - chargeHit;
+            } else {
+                bidCharge = bidCharge - chargeHit;
+                askCharge = askCharge + chargeHit;
+            }
+
+        }
+        let bidPrice = fairValue * (1 - bidCharge);
+        let askPrice = fairValue * (1 + askCharge);
+
+        let bidSize = size;
+        let askSize = size;
+        if (basePos !== 0) {
+            if (basePos > 0) {
+                bidSize -= basePos;
+            } else {
+                askSize += basePos;
+            }
+        }
+
+        const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
+            bidPrice,
+            bidSize,
+        );
+        const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
+            askPrice,
+            askSize,
         );
 
-        const placeAskInstr = makePlacePerpOrder2Instruction(
-            mangoProgramId,
-            group.publicKey,
-            mangoAccount.publicKey,
-            payer.publicKey,
-            cache.publicKey,
-            market.publicKey,
-            market.bids,
-            market.asks,
-            market.eventQueue,
-            mangoAccount.getOpenOrdersKeysInBasketPacked(),
-            bookAdjAsk,
-            nativeAskSize,
-            I64_MAX_BN,
-            new BN(Date.now()),
-            'sell',
-            new BN(20),
-            'postOnlySlide',
-            false,
-            undefined,
-            expiryTimestamp
-        );
-        instructions.push(cancelAllInstr);
-        const posAsTradeSizes = basePos / size;
-        if (posAsTradeSizes < 1 && bidPrice >= 0) {
-            instructions.push(placeBidInstr);
+        const bestBid = bids.getBest();
+        const bestAsk = asks.getBest();
+        const bookAdjBid =
+            bestAsk !== undefined
+                ? BN.min(bestAsk.priceLots.sub(ONE_BN), modelBidPrice)
+                : modelBidPrice;
+        const bookAdjAsk =
+            bestBid !== undefined
+                ? BN.max(bestBid.priceLots.add(ONE_BN), modelAskPrice)
+                : modelAskPrice;
+
+        // TODO use order book to requote if size has changed
+
+        let moveOrders = false;
+
+
+        if (marketContext.lastBookUpdate >= marketContext.lastOrderUpdate + 5) {
+            // if mango book was updated recently, then MangoAccount was also updated
+            moveOrders = openOrders.length < 2 || openOrders.length > 2;
+            for (const o of openOrders) {
+                const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
+                moveOrders =
+                    moveOrders ||
+                    Math.abs(o.price.toNumber() / refPrice.toNumber() - 1) > requoteThresh;
+            }
+        } else {
+            // If order was updated before MangoAccount, then assume that sent order already executed
+            moveOrders =
+                moveOrders ||
+                Math.abs(marketContext.sentBidPrice / bookAdjBid.toNumber() - 1) >
+                requoteThresh ||
+                Math.abs(marketContext.sentAskPrice / bookAdjAsk.toNumber() - 1) >
+                requoteThresh ||
+                (marketContext.params.tif !== undefined && marketContext.lastOrderUpdate + marketContext.params.tif < getUnixTs());
         }
-        if (posAsTradeSizes > -1) {
-            instructions.push(placeAskInstr);
+
+        if (moveOrders) {
+            const expiryTimestamp =
+                marketContext.params.tif !== undefined
+                    ? new BN((Date.now() / 1000) + 255)
+                    : new BN(0);
+
+            const placeBidInstr = makePlacePerpOrder2Instruction(
+                mangoProgramId,
+                group.publicKey,
+                mangoAccount.publicKey,
+                payer.publicKey,
+                cache.publicKey,
+                market.publicKey,
+                market.bids,
+                market.asks,
+                market.eventQueue,
+                mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                bookAdjBid,
+                nativeBidSize,
+                I64_MAX_BN,
+                new BN(Date.now()),
+                'buy',
+                new BN(20),
+                'postOnlySlide',
+                false,
+                undefined,
+                expiryTimestamp
+            );
+
+            const placeAskInstr = makePlacePerpOrder2Instruction(
+                mangoProgramId,
+                group.publicKey,
+                mangoAccount.publicKey,
+                payer.publicKey,
+                cache.publicKey,
+                market.publicKey,
+                market.bids,
+                market.asks,
+                market.eventQueue,
+                mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                bookAdjAsk,
+                nativeAskSize,
+                I64_MAX_BN,
+                new BN(Date.now()),
+                'sell',
+                new BN(20),
+                'postOnlySlide',
+                false,
+                undefined,
+                expiryTimestamp
+            );
+            instructions.push(cancelAllInstr);
+            const posAsTradeSizes = basePos / size;
+            if (posAsTradeSizes < 1 && bidPrice >= 0) {
+                instructions.push(placeBidInstr);
+            }
+            if (posAsTradeSizes > -1) {
+                instructions.push(placeAskInstr);
+            }
+            console.log(
+                `${marketContext.marketName} -`,
+                `Requoting sentBidPx: ${marketContext.sentBidPrice}`,
+                `newBidPx: ${bookAdjBid}`,
+                `sentAskPx: ${marketContext.sentAskPrice}`,
+                `newAskPx: ${bookAdjAsk}`,
+                `aggBid: ${aggBid}`,
+                `addAsk: ${aggAsk}`
+            );
+            marketContext.sentBidPrice = bookAdjBid.toNumber();
+            marketContext.sentAskPrice = bookAdjAsk.toNumber();
+            marketContext.lastOrderUpdate = getUnixTs();
+        } else {
+            // console.log(
+            //   `${marketContext.marketName} Not requoting. No need to move orders`,
+            // );
         }
-        console.log(
-            `${marketContext.marketName} -`,
-            `Requoting sentBidPx: ${marketContext.sentBidPrice}`,
-            `newBidPx: ${bookAdjBid}`,
-            `sentAskPx: ${marketContext.sentAskPrice}`,
-            `newAskPx: ${bookAdjAsk}`,
-            `aggBid: ${aggBid}`,
-            `addAsk: ${aggAsk}`
-        );
-        marketContext.sentBidPrice = bookAdjBid.toNumber();
-        marketContext.sentAskPrice = bookAdjAsk.toNumber();
-        marketContext.lastOrderUpdate = getUnixTs();
     } else {
-        // console.log(
-        //   `${marketContext.marketName} Not requoting. No need to move orders`,
-        // );
+        if (openOrders.length >= 1) {
+            instructions.push(cancelAllInstr);
+        }
     }
 
     // if instruction is only the sequence enforcement, then just send empty
@@ -776,6 +771,7 @@ function makeMarketUpdateInstructions(
     } else {
         return instructions;
     }
+
 }
 
 async function onExit(
