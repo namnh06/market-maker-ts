@@ -610,12 +610,12 @@ function makeMarketUpdateInstructions(
     let askPrice = fairValue * (1 + askCharge);
 
     // Re-calculate Order Price if too volatility
-    if (bidPrice > aggBid) {
-        bidPrice = aggBid * (1 - bidCharge);
-    }
-    if (askPrice < aggAsk) {
-        askPrice = aggAsk * (1 + askCharge);
-    }
+    // if (bidPrice > aggBid) {
+    //     bidPrice = aggBid * (1 - bidCharge);
+    // }
+    // if (askPrice < aggAsk) {
+    //     askPrice = aggAsk * (1 + askCharge);
+    // }
 
     let bidSize = size;
     let askSize = size;
