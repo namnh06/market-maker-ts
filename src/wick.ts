@@ -576,9 +576,8 @@ function makeMarketUpdateInstructions(
     const asks = marketContext.asks;
     // const equity = mangoAccount.computeValue(group, cache).toNumber();
     const equity = marketContext.params.equity;
-    const sizePerc = marketContext.params.sizePerc;
     // const quoteSize = equity * sizePerc;
-    const quoteSize = equity * sizePerc;
+    const quoteSize = equity;
     const aggBid = marketContext.aggBid;
     const aggAsk = marketContext.aggAsk;
     if (aggBid === undefined || aggAsk === undefined) {
@@ -613,6 +612,21 @@ function makeMarketUpdateInstructions(
     let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
     let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
 
+    const size = quoteSize / fairValue;
+    // Hedging charge hit
+    const isHedge = marketContext.params.isHedge;
+    if (
+        isHedge === true &&
+        basePos !== 0 &&
+        Math.abs(basePos) > (size / 5)
+    ) {
+        if (basePos > 0) {
+            askCharge = (marketContext.params.askChargeHit || 0.009) + aggSpread / 2;
+        } else {
+            bidCharge = (marketContext.params.bidChargeHit || 0.009) + aggSpread / 2;
+        }
+    }
+
     if (averageTPS < 200 || volatilityPercentage > 1 || secondVolatilityPercentage > 1) {
         bidCharge += 0.5;
         askCharge += 0.5;
@@ -629,8 +643,6 @@ function makeMarketUpdateInstructions(
     globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
     globalThis.lastFairValue[marketName] = fairValue;
 
-    const requoteThresh = marketContext.params.requoteThresh;
-    const size = quoteSize / fairValue;
     let bidPrice = fairValue * (1 - bidCharge);
     let askPrice = fairValue * (1 + askCharge);
 
@@ -673,9 +685,10 @@ function makeMarketUpdateInstructions(
             : modelAskPrice;
 
     // TODO use order book to requote if size has changed
-
+    const requoteThresh = marketContext.params.requoteThresh;
     let moveOrders = false;
-    if (marketContext.lastBookUpdate >= marketContext.lastOrderUpdate + 2) {
+    if (marketContext.lastBookUpdate >= marketContext.lastOrderUpdate + 3) {
+
         // if mango book was updated recently, then MangoAccount was also updated
         const openOrders = mangoAccount
             .getPerpOpenOrders()
