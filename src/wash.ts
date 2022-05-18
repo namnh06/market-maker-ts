@@ -371,24 +371,26 @@ async function washTrade() {
             );
 
             for (let i = 0; i < marketContexts.length; i++) {
-                const instrSet = makeMarketUpdateInstructions(
-                    mangoGroup,
-                    state.cache,
-                    mangoAccount,
-                    marketContexts[i],
-                    telegramBot
-                );
-                if (instrSet.length > 0) {
-                    instrSet.forEach((ix) => tx.add(ix));
-                    j++;
-                    if (j === params.batch) {
-                        if (averageTPS < params.averageTPS) {
-                            sendDupTxs(client, tx, [], 10);
-                        } else {
-                            client.sendTransaction(tx, payer, [], null);
+                if (marketContexts[i].params.isWash === true) {
+                    const instrSet = makeMarketUpdateInstructions(
+                        mangoGroup,
+                        state.cache,
+                        mangoAccount,
+                        marketContexts[i],
+                        telegramBot
+                    );
+                    if (instrSet.length > 0) {
+                        instrSet.forEach((ix) => tx.add(ix));
+                        j++;
+                        if (j === params.batch) {
+                            if (averageTPS < params.averageTPS) {
+                                sendDupTxs(client, tx, [], 10);
+                            } else {
+                                client.sendTransaction(tx, payer, [], null);
+                            }
+                            tx = new Transaction();
+                            j = 0;
                         }
-                        tx = new Transaction();
-                        j = 0;
                     }
                 }
             }
