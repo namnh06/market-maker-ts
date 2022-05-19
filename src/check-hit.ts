@@ -297,7 +297,20 @@ function checkHit(
     // TODO look at event queue as well for unprocessed fills
     const basePos = perpAccount.getBasePositionUi(market).toFixed(baseLotsDecimals);
     const baseSize = (marketContext.params.size || 0);
-    if (basePos !== baseSize.toFixed(baseLotsDecimals)) {
+    const spotBasePos = Number(mangoAccount
+        .getUiDeposit(cache.rootBankCache[marketIndex], group, marketIndex)
+        .sub(
+            mangoAccount.getUiBorrow(
+                cache.rootBankCache[marketIndex],
+                group,
+                marketIndex,
+            ),
+        ).toFixed(baseLotsDecimals));
+
+    if (
+        basePos !== baseSize.toFixed(baseLotsDecimals) &&
+        (baseSize.toFixed(baseLotsDecimals) + spotBasePos) === 0
+    ) {
         let marketMessage: string = "\n---";
         marketMessage += `\n${marketName}`;
         marketMessage += `\n${marketContext.marketName}`;
