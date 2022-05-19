@@ -289,8 +289,13 @@ function checkHit(
     const marketName = marketContext.marketName;
 
     const perpAccount = mangoAccount.perpAccounts[marketIndex];
+    const priceLotsToUiConvertor = market.priceLotsToUiConvertor;
+    const priceLotsDecimals = priceLotsToUiConvertor.toString().length - (priceLotsToUiConvertor.toString().indexOf('.') + 1);
+
+    const baseLotsToUiConvertor = market.baseLotsToUiConvertor;
+    const baseLotsDecimals = baseLotsToUiConvertor.toString().length - (baseLotsToUiConvertor.toString().indexOf('.') + 1);
     // TODO look at event queue as well for unprocessed fills
-    const basePos = perpAccount.getBasePositionUi(market);
+    const basePos = perpAccount.getBasePositionUi(market).toFixed(baseLotsToUiConvertor);
     const baseSize = marketContext.params.size || 0;
     if (basePos !== baseSize) {
         let marketMessage: string = "\n---";
