@@ -296,8 +296,8 @@ function checkHit(
     const baseLotsDecimals = baseLotsToUiConvertor.toString().length - (baseLotsToUiConvertor.toString().indexOf('.') + 1);
     // TODO look at event queue as well for unprocessed fills
     const basePos = perpAccount.getBasePositionUi(market).toFixed(baseLotsDecimals);
-    const baseSize = marketContext.params.size || 0;
-    if (basePos !== baseSize) {
+    const baseSize = (marketContext.params.size || 0);
+    if (basePos !== baseSize.toFixed(baseLotsDecimals)) {
         let marketMessage: string = "\n---";
         marketMessage += `\n${marketName}`;
         marketMessage += `\n${marketContext.marketName}`;
