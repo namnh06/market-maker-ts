@@ -615,10 +615,11 @@ function makeMarketUpdateInstructions(
     const size = quoteSize / fairValue;
     // Hedging charge hit
     const isHedge = marketContext.params.isHedge;
+    const sizePressure = marketContext.params.sizePressure || 5;
     if (
         isHedge === true &&
         basePos !== 0 &&
-        Math.abs(basePos) > (size / 5)
+        Math.abs(basePos) > (size / sizePressure)
     ) {
         if (basePos > 0) {
             askCharge = (marketContext.params.askChargeHit || 0.009) + aggSpread / 2;
