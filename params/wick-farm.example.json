@@ -1,0 +1,130 @@
+{
+    "group": "mainnet.1",
+    "mangoAccountName": "",
+    "mangoAccountPubkey": "",
+    "interval": 3000,
+    "batch": 2,
+    "assets": {
+        "BTC": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.002,
+                "ftxSize": 100000
+            }
+        },
+        "ETH": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.002,
+                "ftxSize": 100000
+            }
+        },
+        "SOL": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.002,
+                "ftxSize": 100000
+            }
+        },
+        "LUNA": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.002,
+                "ftxSize": 100000
+            }
+        },
+        "AVAX": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.002,
+                "ftxSize": 100000
+            }
+        },
+        "BNB": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.005,
+                "ftxSize": 100000
+            }
+        },
+        "ADA": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.005,
+                "ftxSize": 50000
+            }
+        },
+        "FTT": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.005,
+                "ftxSize": 20000
+            }
+        },
+        "SRM": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.005,
+                "ftxSize": 10000
+            }
+        },
+        "RAY": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.005,
+                "ftxSize": 10000
+            }
+        },
+        "MNGO": {
+            "perp": {
+                "isWick": true,
+                "equity": 100000,
+                "sizePerc": 1,
+                "bidCharge": 0.01,
+                "askCharge": 0.01,
+                "requoteThresh": 0.005,
+                "ftxSize": 5000
+            }
+        }
+    }
+}

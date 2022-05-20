@@ -19,6 +19,9 @@ then
 elif [ $1 == "--wick" ]
 then
     yarn wick
+elif [ $1 == "--wick-farm" ]
+then
+    yarn wick-farm
 elif [ $1 == "--hedge" ]
 then
     yarn hedge
