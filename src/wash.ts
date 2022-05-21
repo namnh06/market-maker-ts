@@ -577,99 +577,124 @@ function makeMarketUpdateInstructions(
         const aggBid = marketContext.aggBid;
         const aggAsk = marketContext.aggAsk;
         if (aggBid === undefined || aggAsk === undefined) {
+            console.log(`${marketContext.marketName} No Agg Book`);
             return [];
         }
+        const bids = marketContext.bids;
+        const asks = marketContext.asks;
+        const bestBid = bids.getBest();
+        const bestAsk = asks.getBest();
+
         const fairValue = (aggBid + aggAsk) / 2;
-        const aggSpread: number = (aggAsk - aggBid) / fairValue;
         // Start building the transaction
         const instructions: TransactionInstruction[] = [];
 
-        const acceptableBPS: number = (marketContext.params.acceptableBPS || 20) + (aggSpread / 2);
-        const acceptableBPSToNumber: number = fairValue * (acceptableBPS / 10000);
+        const charge: number = (marketContext.params.charge || 0.002);
+        if (charge >= 0.01) {
+            console.warn(`DO NOTHING DUE TO CHARGE >= 1%`);
+            return [];
+        }
 
         // Start check bid and ask
         message += `\nAccount: ${mangoAccount.name} - ${mangoAccount.publicKey.toString()}`
-        if (basePos > 0) {
-            const bidAcceptablePrice = fairValue - acceptableBPSToNumber;
+        if (
+            basePos > 0 &&
+            bestBid !== undefined &&
+            bestBid.owner.toString() !== mangoAccount.publicKey.toString()
+        ) {
+            const bidAcceptablePrice = fairValue * (1 - charge);
             message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
             const takerSize: number = basePos;
-            const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
-                bidAcceptablePrice,
-                takerSize,
-            );
-            const takerSell = makePlacePerpOrder2Instruction(
-                mangoProgramId,
-                group.publicKey,
-                mangoAccount.publicKey,
-                payer.publicKey,
-                cache.publicKey,
-                market.publicKey,
-                market.bids,
-                market.asks,
-                market.eventQueue,
-                mangoAccount.getOpenOrdersKeysInBasketPacked(),
-                modelBidPrice,
-                nativeBidSize,
-                I64_MAX_BN,
-                new BN(Date.now()),
-                'sell',
-                new BN(20),
-                'ioc',
-                true
-            );
-            message += `\nSelling ...`;
-            message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bidAcceptablePrice} `;
+            const isBestBidAcceptable: boolean = bestBid.price >= bidAcceptablePrice;
+            if (isBestBidAcceptable) {
+                const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
+                    bidAcceptablePrice,
+                    takerSize,
+                );
+                const takerSell = makePlacePerpOrder2Instruction(
+                    mangoProgramId,
+                    group.publicKey,
+                    mangoAccount.publicKey,
+                    payer.publicKey,
+                    cache.publicKey,
+                    market.publicKey,
+                    market.bids,
+                    market.asks,
+                    market.eventQueue,
+                    mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                    modelBidPrice,
+                    nativeBidSize,
+                    I64_MAX_BN,
+                    new BN(Date.now()),
+                    'sell',
+                    new BN(20),
+                    'ioc',
+                    true
+                );
+                message += `\nSelling ...`;
+                message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bidAcceptablePrice} `;
 
-            instructions.push(takerSell);
+                instructions.push(takerSell);
 
-            if (globalThis.lastSendTelegram === undefined) {
-                telegramBot.telegram.sendMessage(telegramChannelId, message);
-                globalThis.lastSendTelegram = Date.now() / 1000;
-            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
-                telegramBot.telegram.sendMessage(telegramChannelId, message);
-                globalThis.lastSendTelegram = Date.now() / 1000;
+                if (globalThis.lastSendTelegram === undefined) {
+                    telegramBot.telegram.sendMessage(telegramChannelId, message);
+                    globalThis.lastSendTelegram = Date.now() / 1000;
+                } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
+                    telegramBot.telegram.sendMessage(telegramChannelId, message);
+                    globalThis.lastSendTelegram = Date.now() / 1000;
+                }
+            } else {
+                message += `\nDo nothing due to the price is not good`;
             }
-        } else if (basePos < 0) {
-            const askAcceptablePrice = fairValue + acceptableBPSToNumber;
+        } else if (
+            basePos < 0 &&
+            bestAsk !== undefined &&
+            bestAsk.owner.toString() !== mangoAccount.publicKey.toString()
+        ) {
+            const askAcceptablePrice = fairValue * (1 + charge);
             message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
             const takerSize: number = Math.abs(basePos);
+            const isBestAskAcceptable: boolean = bestAsk.price <= askAcceptablePrice;
+            if (isBestAskAcceptable) {
+                const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
+                    askAcceptablePrice,
+                    takerSize,
+                );
 
-            const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
-                askAcceptablePrice,
-                takerSize,
-            );
+                const takerBuy = makePlacePerpOrder2Instruction(
+                    mangoProgramId,
+                    group.publicKey,
+                    mangoAccount.publicKey,
+                    payer.publicKey,
+                    cache.publicKey,
+                    market.publicKey,
+                    market.bids,
+                    market.asks,
+                    market.eventQueue,
+                    mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                    modelAskPrice,
+                    nativeAskSize,
+                    I64_MAX_BN,
+                    new BN(Date.now()),
+                    'buy',
+                    new BN(20),
+                    'ioc',
+                    true
+                );
+                message += `\nBuying ...`;
+                message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${askAcceptablePrice}`;
 
-            const takerBuy = makePlacePerpOrder2Instruction(
-                mangoProgramId,
-                group.publicKey,
-                mangoAccount.publicKey,
-                payer.publicKey,
-                cache.publicKey,
-                market.publicKey,
-                market.bids,
-                market.asks,
-                market.eventQueue,
-                mangoAccount.getOpenOrdersKeysInBasketPacked(),
-                modelAskPrice,
-                nativeAskSize,
-                I64_MAX_BN,
-                new BN(Date.now()),
-                'buy',
-                new BN(20),
-                'ioc',
-                true
-            );
-            message += `\nBuying ...`;
-            message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${askAcceptablePrice}`;
+                instructions.push(takerBuy);
 
-            instructions.push(takerBuy);
-
-            if (globalThis.lastSendTelegram === undefined) {
-                telegramBot.telegram.sendMessage(telegramChannelId, message);
-                globalThis.lastSendTelegram = Date.now() / 1000;
-            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
-                telegramBot.telegram.sendMessage(telegramChannelId, message);
-                globalThis.lastSendTelegram = Date.now() / 1000;
+                if (globalThis.lastSendTelegram === undefined) {
+                    telegramBot.telegram.sendMessage(telegramChannelId, message);
+                    globalThis.lastSendTelegram = Date.now() / 1000;
+                } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
+                    telegramBot.telegram.sendMessage(telegramChannelId, message);
+                    globalThis.lastSendTelegram = Date.now() / 1000;
+                }
+            } else {
+                message += `\nDo nothing due to the price is not good`;
             }
         }
         console.log(message);

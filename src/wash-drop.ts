@@ -21,16 +21,14 @@ import {
     getUnixTs,
     GroupConfig,
     IDS,
-    makeCancelAllPerpOrdersInstruction,
     makePlacePerpOrder2Instruction,
+    I64_MAX_BN,
     MangoAccount,
     MangoAccountLayout,
     MangoCache,
     MangoCacheLayout,
     MangoClient,
     MangoGroup,
-    ONE_BN,
-    I64_MAX_BN,
     PerpMarket,
     PerpMarketConfig,
     sleep,
@@ -41,16 +39,18 @@ import path from 'path';
 import {
     loadMangoAccountWithName,
     loadMangoAccountWithPubkey,
-    makeCheckAndSetSequenceNumberInstruction,
     makeInitSequenceInstruction,
     seqEnforcerProgramId,
     listenersArray,
-    percentageVolatility
 } from './utils';
 import { findProgramAddressSync } from '@project-serum/anchor/dist/cjs/utils/pubkey';
+import { Context, Telegraf } from 'telegraf';
 
-declare var lastFairValue;
-declare var secondLastFairValue;
+declare var lastSendTelegram: number;
+interface MyContext extends Context {
+    myProp?: string
+    myOtherProp?: number
+}
 
 const paramsFileName = process.env.PARAMS || 'default.json';
 const params = JSON.parse(
@@ -70,6 +70,9 @@ const payer = new Account(
 );
 
 const config = new Config(IDS);
+
+const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN || "";
+const telegramChannelId = process.env.TELEGRAM_CHANNEL_ID || "";
 
 const groupIds = config.getGroupWithName(params.group) as GroupConfig;
 if (!groupIds) {
@@ -225,7 +228,9 @@ async function initSeqEnfAccounts(
         break;
     }
 }
-async function fullMarketMaker() {
+
+async function washTrade() {
+    console.log(`--- BEGIN WASH TRADE ---`);
     const connection = new Connection(
         process.env.ENDPOINT_URL || config.cluster_urls[cluster],
         'processed' as Commitment,
@@ -255,6 +260,7 @@ async function fullMarketMaker() {
             'Please add mangoAccountName or mangoAccountPubkey to params file',
         );
     }
+
     const perpMarkets = await Promise.all(
         Object.keys(params.assets).map((baseSymbol) => {
             const perpMarketConfig = getPerpMarketByBaseSymbol(
@@ -270,6 +276,8 @@ async function fullMarketMaker() {
         }),
     );
     // client.cancelAllPerpOrders(mangoGroup, perpMarkets, mangoAccount, payer);
+    const telegramBot = new Telegraf<MyContext>(telegramBotToken);
+
     const marketContexts: MarketContext[] = [];
     for (const baseSymbol in params.assets) {
         const perpMarketConfig = getPerpMarketByBaseSymbol(
@@ -288,6 +296,7 @@ async function fullMarketMaker() {
         if (perpMarket === undefined) {
             throw new Error('Cannot find perp market');
         }
+
         marketContexts.push({
             marketName: perpMarketConfig.name,
             params: params.assets[baseSymbol].perp,
@@ -322,7 +331,6 @@ async function fullMarketMaker() {
         return listener;
     })
 
-
     const state = await loadAccountAndMarketState(
         connection,
         mangoGroup,
@@ -340,13 +348,19 @@ async function fullMarketMaker() {
     );
 
     process.on('SIGINT', function () {
+        console.log(`--- END WASH TRADE ---`);
         console.log('Caught keyboard interrupt. Canceling orders');
         control.isRunning = false;
-        onExit(client, payer, mangoGroup, mangoAccount, marketContexts);
     });
 
     while (control.isRunning) {
         try {
+            mangoAccount = state.mangoAccount;
+
+            let j = 0;
+            let tx = new Transaction();
+
+            // Calculate Average TPS
             const selfConnection = new Connection(
                 process.env.ENDPOINT_URL || config.cluster_urls[cluster]
             );
@@ -355,27 +369,25 @@ async function fullMarketMaker() {
                 perfSamples.map((x) => x.numTransactions / x.samplePeriodSecs)
                     .reduce((a, b) => a + b, 0) / 3
             );
-            mangoAccount = state.mangoAccount;
-            console.log(`Current TPS: ${averageTPS}`);
-            let j = 0;
-            let tx = new Transaction();
+
             for (let i = 0; i < marketContexts.length; i++) {
-                const isWick = marketContexts[i].params.isWick === true ? true : false;
-                if (isWick) {
+                if (marketContexts[i].params.isWash === true) {
                     const instrSet = makeMarketUpdateInstructions(
                         mangoGroup,
                         state.cache,
                         mangoAccount,
                         marketContexts[i],
-                        averageTPS
+                        telegramBot
                     );
-
                     if (instrSet.length > 0) {
                         instrSet.forEach((ix) => tx.add(ix));
                         j++;
                         if (j === params.batch) {
-                            // sendDupTxs(client, tx, [], 10);
-                            client.sendTransaction(tx, payer, [], null);
+                            if (averageTPS < params.averageTPS) {
+                                sendDupTxs(client, tx, [], 10);
+                            } else {
+                                client.sendTransaction(tx, payer, [], null);
+                            }
                             tx = new Transaction();
                             j = 0;
                         }
@@ -383,16 +395,20 @@ async function fullMarketMaker() {
                 }
             }
             if (tx.instructions.length) {
-                // sendDupTxs(client, tx, [], 10);
-                client.sendTransaction(tx, payer, [], null);
+                if (averageTPS < params.averageTPS) {
+                    sendDupTxs(client, tx, [], 10);
+                } else {
+                    client.sendTransaction(tx, payer, [], null);
+                }
             }
         } catch (e) {
             console.log(e);
         } finally {
-            console.log(
-                `${new Date().toUTCString()} sleeping for ${control.interval / 1000}s`,
-            );
-            await sleep(control.interval);
+            let timeSleep = control.interval;
+            // console.log(
+            //   `${new Date().toUTCString()} sleeping for ${timeSleep / 1000}s`,
+            // );
+            await sleep(timeSleep);
         }
     }
 }
@@ -536,6 +552,133 @@ function listenState(
     }
 }
 
+function makeMarketUpdateInstructions(
+    group: MangoGroup,
+    cache: MangoCache,
+    mangoAccount: MangoAccount,
+    marketContext: MarketContext,
+    telegramBot
+): TransactionInstruction[] {
+    // Right now only uses the perp
+    const marketIndex = marketContext.marketIndex;
+    const marketName = marketContext.marketName;
+    const market = marketContext.market;
+    let message: string = `--- ${marketName} ---`;
+    const priceLotsToUiConvertor = market.priceLotsToUiConvertor;
+    const priceLotsDecimals = priceLotsToUiConvertor.toString().length - (priceLotsToUiConvertor.toString().indexOf('.') + 1);
+
+    const baseLotsToUiConvertor = market.baseLotsToUiConvertor;
+    const baseLotsDecimals = baseLotsToUiConvertor.toString().length - (baseLotsToUiConvertor.toString().indexOf('.') + 1);
+
+    // Get Base Position
+    const perpAccount = mangoAccount.perpAccounts[marketIndex];
+    const basePos = perpAccount.getBasePositionUi(market);
+    if (basePos !== 0) {
+        const aggBid = marketContext.aggBid;
+        const aggAsk = marketContext.aggAsk;
+        if (aggBid === undefined || aggAsk === undefined) {
+            return [];
+        }
+        const fairValue = (aggBid + aggAsk) / 2;
+        const aggSpread: number = (aggAsk - aggBid) / fairValue;
+        // Start building the transaction
+        const instructions: TransactionInstruction[] = [];
+
+        const acceptableBPS: number = (marketContext.params.acceptableBPS || 20) + (aggSpread / 2);
+        const acceptableBPSToNumber: number = fairValue * (acceptableBPS / 10000);
+
+        // Start check bid and ask
+        message += `\nAccount: ${mangoAccount.name} - ${mangoAccount.publicKey.toString()}`
+        if (basePos > 0) {
+            const bidAcceptablePrice = fairValue - acceptableBPSToNumber;
+            message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
+            const takerSize: number = basePos;
+            const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
+                bidAcceptablePrice,
+                takerSize,
+            );
+            const takerSell = makePlacePerpOrder2Instruction(
+                mangoProgramId,
+                group.publicKey,
+                mangoAccount.publicKey,
+                payer.publicKey,
+                cache.publicKey,
+                market.publicKey,
+                market.bids,
+                market.asks,
+                market.eventQueue,
+                mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                modelBidPrice,
+                nativeBidSize,
+                I64_MAX_BN,
+                new BN(Date.now()),
+                'sell',
+                new BN(20),
+                'ioc',
+                true
+            );
+            message += `\nSelling ...`;
+            message += `\nWash Trade - IOC selling for size: ${takerSize}, at price: ${bidAcceptablePrice} `;
+
+            instructions.push(takerSell);
+
+            if (globalThis.lastSendTelegram === undefined) {
+                telegramBot.telegram.sendMessage(telegramChannelId, message);
+                globalThis.lastSendTelegram = Date.now() / 1000;
+            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
+                telegramBot.telegram.sendMessage(telegramChannelId, message);
+                globalThis.lastSendTelegram = Date.now() / 1000;
+            }
+        } else if (basePos < 0) {
+            const askAcceptablePrice = fairValue + acceptableBPSToNumber;
+            message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
+            const takerSize: number = Math.abs(basePos);
+
+            const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
+                askAcceptablePrice,
+                takerSize,
+            );
+
+            const takerBuy = makePlacePerpOrder2Instruction(
+                mangoProgramId,
+                group.publicKey,
+                mangoAccount.publicKey,
+                payer.publicKey,
+                cache.publicKey,
+                market.publicKey,
+                market.bids,
+                market.asks,
+                market.eventQueue,
+                mangoAccount.getOpenOrdersKeysInBasketPacked(),
+                modelAskPrice,
+                nativeAskSize,
+                I64_MAX_BN,
+                new BN(Date.now()),
+                'buy',
+                new BN(20),
+                'ioc',
+                true
+            );
+            message += `\nBuying ...`;
+            message += `\nWash Trade - ICO buying for size: ${takerSize}, at price: ${askAcceptablePrice}`;
+
+            instructions.push(takerBuy);
+
+            if (globalThis.lastSendTelegram === undefined) {
+                telegramBot.telegram.sendMessage(telegramChannelId, message);
+                globalThis.lastSendTelegram = Date.now() / 1000;
+            } else if (((Date.now() / 1000) - globalThis.lastSendTelegram) > 30) {
+                telegramBot.telegram.sendMessage(telegramChannelId, message);
+                globalThis.lastSendTelegram = Date.now() / 1000;
+            }
+        }
+        console.log(message);
+        return instructions;
+    } else {
+        return [];
+    }
+}
+
 async function sendDupTxs(
     client: MangoClient,
     transaction: Transaction,
@@ -561,305 +704,9 @@ async function sendDupTxs(
     await Promise.all(transactions);
 }
 
-function makeMarketUpdateInstructions(
-    group: MangoGroup,
-    cache: MangoCache,
-    mangoAccount: MangoAccount,
-    marketContext: MarketContext,
-    averageTPS: number,
-): TransactionInstruction[] {
-    // Right now only uses the perp
-    const marketIndex = marketContext.marketIndex;
-    const market = marketContext.market;
-    const marketName = marketContext.marketName;
-    const bids = marketContext.bids;
-    const asks = marketContext.asks;
-    // const equity = mangoAccount.computeValue(group, cache).toNumber();
-    const equity = marketContext.params.equity;
-    // const quoteSize = equity * sizePerc;
-    const quoteSize = equity;
-    const aggBid = marketContext.aggBid;
-    const aggAsk = marketContext.aggAsk;
-    if (aggBid === undefined || aggAsk === undefined) {
-        console.log(`${marketContext.marketName} No Agg Book`);
-        return [];
-    }
-
-    const fairValue: number = (aggBid + aggAsk) / 2;
-    if (globalThis.lastFairValue === undefined) {
-        globalThis.lastFairValue = [];
-    }
-    if (globalThis.secondLastFairValue === undefined) {
-        globalThis.secondLastFairValue = [];
-    }
-
-    if (globalThis.lastFairValue[marketName] === undefined) {
-        globalThis.lastFairValue[marketName] = fairValue;
-    }
-    if (globalThis.secondLastFairValue[marketName] === undefined) {
-        globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
-    }
-
-    const volatilityPercentage = percentageVolatility(fairValue, globalThis.lastFairValue[marketName]);
-    const secondVolatilityPercentage = percentageVolatility(fairValue, globalThis.secondLastFairValue[marketName]);
-
-    const aggSpread: number = (aggAsk - aggBid) / fairValue;
-    const perpAccount = mangoAccount.perpAccounts[marketIndex];
-    // TODO look at event queue as well for unprocessed fills
-    const basePos = perpAccount.getBasePositionUi(market);
-
-    let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
-    let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
-
-    const size = quoteSize / fairValue;
-    // Hedging charge hit
-    const isHedge = marketContext.params.isHedge;
-    const sizePressure = marketContext.params.sizePressure || 5;
-    if (
-        isHedge === true &&
-        basePos !== 0 &&
-        Math.abs(basePos) > (size / sizePressure)
-    ) {
-        if (basePos > 0) {
-            askCharge = (marketContext.params.askChargeHit || 0.009) + aggSpread / 2;
-        } else {
-            bidCharge = (marketContext.params.bidChargeHit || 0.009) + aggSpread / 2;
-        }
-    }
-
-    if (averageTPS < 200 || volatilityPercentage > 1 || secondVolatilityPercentage > 1) {
-        bidCharge += 0.5;
-        askCharge += 0.5;
-    } else if (averageTPS < 500 || volatilityPercentage > 0.8 || secondVolatilityPercentage > 0.8) {
-        bidCharge += 0.2;
-        askCharge += 0.2;
-    } else if (averageTPS < 1000 || volatilityPercentage > 0.5 || secondVolatilityPercentage > 0.5) {
-        bidCharge += 0.05;
-        askCharge += 0.05;
-    } else if (averageTPS < 1500 || volatilityPercentage > 0.2 || secondVolatilityPercentage > 0.2) {
-        bidCharge += 0.006;
-        askCharge += 0.006;
-    }
-    globalThis.secondLastFairValue[marketName] = globalThis.lastFairValue[marketName];
-    globalThis.lastFairValue[marketName] = fairValue;
-
-    let bidPrice = fairValue * (1 - bidCharge);
-    let askPrice = fairValue * (1 + askCharge);
-
-    // Re-calculate Order Price if too volatility
-    if (bidPrice > aggBid) {
-        bidPrice = aggBid * (1 - bidCharge);
-    }
-    if (askPrice < aggAsk) {
-        askPrice = aggAsk * (1 + askCharge);
-    }
-
-    let bidSize = size;
-    let askSize = size;
-    if (basePos !== 0) {
-        if (basePos > 0) {
-            bidSize -= basePos;
-        } else {
-            askSize += basePos;
-        }
-    }
-
-    const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
-        bidPrice,
-        bidSize,
-    );
-    const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
-        askPrice,
-        askSize,
-    );
-
-    const bestBid = bids.getBest();
-    const bestAsk = asks.getBest();
-    const bookAdjBid =
-        bestAsk !== undefined
-            ? BN.min(bestAsk.priceLots.sub(ONE_BN), modelBidPrice)
-            : modelBidPrice;
-    const bookAdjAsk =
-        bestBid !== undefined
-            ? BN.max(bestBid.priceLots.add(ONE_BN), modelAskPrice)
-            : modelAskPrice;
-
-    // TODO use order book to requote if size has changed
-    const requoteThresh = marketContext.params.requoteThresh;
-    let moveOrders = false;
-    if (marketContext.lastBookUpdate >= marketContext.lastOrderUpdate + 3) {
-
-        // if mango book was updated recently, then MangoAccount was also updated
-        const openOrders = mangoAccount
-            .getPerpOpenOrders()
-            .filter((o) => o.marketIndex === marketIndex);
-        moveOrders = openOrders.length < 2 || openOrders.length > 2;
-        for (const o of openOrders) {
-            const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
-            moveOrders =
-                moveOrders ||
-                Math.abs(o.price.toNumber() / refPrice.toNumber() - 1) > requoteThresh;
-        }
-    } else {
-        // If order was updated before MangoAccount, then assume that sent order already executed
-        moveOrders =
-            moveOrders ||
-            Math.abs(marketContext.sentBidPrice / bookAdjBid.toNumber() - 1) >
-            requoteThresh ||
-            Math.abs(marketContext.sentAskPrice / bookAdjAsk.toNumber() - 1) >
-            requoteThresh ||
-            (marketContext.params.tif !== undefined && marketContext.lastOrderUpdate + marketContext.params.tif < getUnixTs());
-    }
-
-    // Start building the transaction
-    const instructions: TransactionInstruction[] = [
-        makeCheckAndSetSequenceNumberInstruction(
-            marketContext.sequenceAccount,
-            payer.publicKey,
-            Math.round(getUnixTs() * 1000),
-        ),
-    ];
-    const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
-        mangoProgramId,
-        group.publicKey,
-        mangoAccount.publicKey,
-        payer.publicKey,
-        market.publicKey,
-        market.bids,
-        market.asks,
-        new BN(20),
-    );
-    if (moveOrders) {
-        const expiryTimestamp =
-            marketContext.params.tif !== undefined
-                ? new BN((Date.now() / 1000) + 255)
-                : new BN(0);
-
-        const placeBidInstr = makePlacePerpOrder2Instruction(
-            mangoProgramId,
-            group.publicKey,
-            mangoAccount.publicKey,
-            payer.publicKey,
-            cache.publicKey,
-            market.publicKey,
-            market.bids,
-            market.asks,
-            market.eventQueue,
-            mangoAccount.getOpenOrdersKeysInBasketPacked(),
-            bookAdjBid,
-            nativeBidSize,
-            I64_MAX_BN,
-            new BN(Date.now()),
-            'buy',
-            new BN(20),
-            'postOnlySlide',
-            false,
-            undefined,
-            expiryTimestamp
-        );
-
-        const placeAskInstr = makePlacePerpOrder2Instruction(
-            mangoProgramId,
-            group.publicKey,
-            mangoAccount.publicKey,
-            payer.publicKey,
-            cache.publicKey,
-            market.publicKey,
-            market.bids,
-            market.asks,
-            market.eventQueue,
-            mangoAccount.getOpenOrdersKeysInBasketPacked(),
-            bookAdjAsk,
-            nativeAskSize,
-            I64_MAX_BN,
-            new BN(Date.now()),
-            'sell',
-            new BN(20),
-            'postOnlySlide',
-            false,
-            undefined,
-            expiryTimestamp
-        );
-        instructions.push(cancelAllInstr);
-        const posAsTradeSizes = basePos / size;
-        if (posAsTradeSizes < 1 && bidPrice >= 0) {
-            instructions.push(placeBidInstr);
-        }
-        if (posAsTradeSizes > -1) {
-            instructions.push(placeAskInstr);
-        }
-        console.log(
-            `${marketContext.marketName} -`,
-            `Requoting sentBidPx: ${marketContext.sentBidPrice}`,
-            `newBidPx: ${bookAdjBid}`,
-            `sentAskPx: ${marketContext.sentAskPrice}`,
-            `newAskPx: ${bookAdjAsk}`,
-            `aggBid: ${aggBid}`,
-            `addAsk: ${aggAsk}`
-        );
-        marketContext.sentBidPrice = bookAdjBid.toNumber();
-        marketContext.sentAskPrice = bookAdjAsk.toNumber();
-        marketContext.lastOrderUpdate = getUnixTs();
-    } else {
-        // console.log(
-        //   `${marketContext.marketName} Not requoting. No need to move orders`,
-        // );
-    }
-
-    // if instruction is only the sequence enforcement, then just send empty
-    if (instructions.length === 1) {
-        return [];
-    } else {
-        return instructions;
-    }
-}
-
-async function onExit(
-    client: MangoClient,
-    payer: Account,
-    group: MangoGroup,
-    mangoAccount: MangoAccount,
-    marketContexts: MarketContext[],
-) {
-    await sleep(control.interval);
-    mangoAccount = await client.getMangoAccount(
-        mangoAccount.publicKey,
-        group.dexProgramId,
-    );
-    let tx = new Transaction();
-    const txProms: any[] = [];
-    for (let i = 0; i < marketContexts.length; i++) {
-        const mc = marketContexts[i];
-        const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
-            mangoProgramId,
-            group.publicKey,
-            mangoAccount.publicKey,
-            payer.publicKey,
-            mc.market.publicKey,
-            mc.market.bids,
-            mc.market.asks,
-            new BN(20),
-        );
-        tx.add(cancelAllInstr);
-        if (tx.instructions.length === params.batch) {
-            // txProms.push(client.sendTransaction(tx, payer, []));
-            tx = new Transaction();
-        }
-    }
-
-    if (tx.instructions.length) {
-        // txProms.push(client.sendTransaction(tx, payer, []));
-    }
-    const txids = await Promise.all(txProms);
-    txids.forEach((txid) => {
-        console.log(`cancel successful: ${txid.toString()}`);
-    });
-    process.exit();
-}
-
 function startMarketMaker() {
     if (control.isRunning) {
-        fullMarketMaker().finally(startMarketMaker);
+        washTrade().finally(startMarketMaker);
     }
 }
 
