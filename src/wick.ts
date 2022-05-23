@@ -603,13 +603,12 @@ function makeMarketUpdateInstructions(
     const volatilityPercentage = percentageVolatility(fairValue, globalThis.lastFairValue[marketName]);
     const secondVolatilityPercentage = percentageVolatility(fairValue, globalThis.secondLastFairValue[marketName]);
 
-    const aggSpread: number = (aggAsk - aggBid) / fairValue;
     const perpAccount = mangoAccount.perpAccounts[marketIndex];
     // TODO look at event queue as well for unprocessed fills
     const basePos = perpAccount.getBasePositionUi(market);
 
-    let bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
-    let askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
+    let bidCharge = (marketContext.params.bidCharge || 0.05);
+    let askCharge = (marketContext.params.askCharge || 0.05);
 
     const size = quoteSize / fairValue;
     // Hedging charge hit
@@ -621,9 +620,9 @@ function makeMarketUpdateInstructions(
         Math.abs(basePos) > (size / sizePressure)
     ) {
         if (basePos > 0) {
-            askCharge = (marketContext.params.askChargeHit || 0.009) + aggSpread / 2;
+            askCharge = (marketContext.params.askChargeHit || 0.009);
         } else {
-            bidCharge = (marketContext.params.bidChargeHit || 0.009) + aggSpread / 2;
+            bidCharge = (marketContext.params.bidChargeHit || 0.009);
         }
     }
 
