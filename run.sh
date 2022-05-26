@@ -10,6 +10,9 @@ then
 elif [ $1 == "--wash" ]
 then
     yarn wash
+elif [ $1 == "--wash-drop" ]
+then
+    yarn wash-drop
 elif [ $1 == "--scan" ]
 then
     yarn scan

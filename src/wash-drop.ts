@@ -580,17 +580,19 @@ function makeMarketUpdateInstructions(
             return [];
         }
         const fairValue = (aggBid + aggAsk) / 2;
-        const aggSpread: number = (aggAsk - aggBid) / fairValue;
         // Start building the transaction
         const instructions: TransactionInstruction[] = [];
 
-        const acceptableBPS: number = (marketContext.params.acceptableBPS || 20) + (aggSpread / 2);
-        const acceptableBPSToNumber: number = fairValue * (acceptableBPS / 10000);
+        const charge: number = (marketContext.params.charge || 0.002);
+        if (charge >= 0.01) {
+            console.warn(`DO NOTHING DUE TO CHARGE >= 1%`);
+            return [];
+        }
 
         // Start check bid and ask
         message += `\nAccount: ${mangoAccount.name} - ${mangoAccount.publicKey.toString()}`
         if (basePos > 0) {
-            const bidAcceptablePrice = fairValue - acceptableBPSToNumber;
+            const bidAcceptablePrice = fairValue * (1 - charge);
             message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
             const takerSize: number = basePos;
             const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
@@ -630,7 +632,7 @@ function makeMarketUpdateInstructions(
                 globalThis.lastSendTelegram = Date.now() / 1000;
             }
         } else if (basePos < 0) {
-            const askAcceptablePrice = fairValue + acceptableBPSToNumber;
+            const askAcceptablePrice = fairValue * (1 + charge);
             message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)}`;
             const takerSize: number = Math.abs(basePos);
 
