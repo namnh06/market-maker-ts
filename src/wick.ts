@@ -697,7 +697,8 @@ function makeMarketUpdateInstructions(
             const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
             moveOrders =
                 moveOrders ||
-                Math.abs(o.price.toNumber() / refPrice.toNumber() - 1) > requoteThresh;
+                Math.abs(o.price.toNumber() / refPrice.toNumber() - 1) > requoteThresh ||
+                (marketContext.params.tif !== undefined && marketContext.lastOrderUpdate + marketContext.params.tif < getUnixTs());
         }
     } else {
         // If order was updated before MangoAccount, then assume that sent order already executed
