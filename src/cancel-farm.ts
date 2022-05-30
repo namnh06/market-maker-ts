@@ -663,10 +663,10 @@ function makeMarketUpdateInstructions(
 
     // Re-calculate Order Price if too volatility
     if (bidPrice > aggBid) {
-        bidPrice = aggBid * (1 - bidCharge);
+        bidPrice = aggBid;
     }
     if (askPrice < aggAsk) {
-        askPrice = aggAsk * (1 + askCharge);
+        askPrice = aggAsk;
     }
 
     // Start building the transaction
