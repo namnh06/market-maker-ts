@@ -10,6 +10,7 @@
     "scratch": "ts-node src/scratch.ts",
     "format": "prettier --check .",
     "cancel": "ts-node src/cancel.ts",
+    "cancel-farm": "ts-node src/cancel-farm.ts",
     "cancel-immediately": "ts-node src/cancel-immediately.ts",
     "wash": "ts-node src/wash.ts",
     "wash-drop": "ts-node src/wash-drop.ts",
