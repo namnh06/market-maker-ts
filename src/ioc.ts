@@ -29,7 +29,6 @@ import {
     MangoCacheLayout,
     MangoClient,
     MangoGroup,
-    ONE_BN,
     I64_MAX_BN,
     PerpMarket,
     PerpMarketConfig,
@@ -231,7 +230,7 @@ async function initSeqEnfAccounts(
         break;
     }
 }
-async function fullMarketMaker() {
+async function fullImmediatelyOrCancel() {
     const connection = new Connection(
         process.env.ENDPOINT_URL || config.cluster_urls[cluster],
         'processed' as Commitment,
@@ -347,9 +346,8 @@ async function fullMarketMaker() {
     );
 
     process.on('SIGINT', function () {
-        console.log('Caught keyboard interrupt. Canceling orders');
         control.isRunning = false;
-        onExit(client, payer, mangoGroup, mangoAccount, marketContexts);
+        onExit();
     });
     while (control.isRunning) {
         try {
@@ -357,9 +355,9 @@ async function fullMarketMaker() {
             let j = 0;
             let tx = new Transaction();
             for (let i = 0; i < marketContexts.length; i++) {
-                const isTrade = marketContexts[i].params.isTrade === true ? true : false;
+                const isTrade = marketContexts[i].params.isTrade;
                 if (isTrade) {
-                    const instrSet = makeMarketUpdateInstructions(
+                    const instrSet = makeMarketInstruction(
                         mangoGroup,
                         state.cache,
                         mangoAccount,
@@ -388,9 +386,9 @@ async function fullMarketMaker() {
         } catch (e) {
             console.log(e);
         } finally {
-            // console.log(
-            // `${new Date().toUTCString()} sleeping for ${control.interval / 1000}s`,
-            // );
+            console.log(
+                `${new Date().toUTCString()} sleeping for ${control.interval / 1000}s`,
+            );
             await sleep(control.interval);
         }
     }
@@ -560,7 +558,7 @@ async function sendDupTxs(
     await Promise.all(transactions);
 }
 
-function makeMarketUpdateInstructions(
+function makeMarketInstruction(
     group: MangoGroup,
     cache: MangoCache,
     mangoAccount: MangoAccount,
@@ -572,14 +570,11 @@ function makeMarketUpdateInstructions(
     const market = marketContext.market;
     const bids = marketContext.bids;
     const asks = marketContext.asks;
-    // const equity = mangoAccount.computeValue(group, cache).toNumber();
     const equity = marketContext.params.equity;
-    const sizePerc = marketContext.params.sizePerc;
-    // const quoteSize = equity * sizePerc;
+    const quoteSize = equity;
     const aggBid = marketContext.aggBid;
     const aggAsk = marketContext.aggAsk;
     if (aggBid === undefined || aggAsk === undefined) {
-        // TODO deal with this better; probably cancel all if there are any orders open
         console.log(`${marketContext.marketName} No Agg Book`);
         return [];
     }
@@ -591,27 +586,20 @@ function makeMarketUpdateInstructions(
     const baseLotsDecimals = baseLotsToUiConvertor.toString().length - (baseLotsToUiConvertor.toString().indexOf('.') + 1);
 
     const fairValue: number = (aggBid + aggAsk) / 2;
-    const aggSpread: number = (aggAsk - aggBid) / fairValue;
     const perpAccount = mangoAccount.perpAccounts[marketIndex];
     // TODO look at event queue as well for unprocessed fills
     const basePos = perpAccount.getBasePositionUi(market);
 
-    const bidCharge = (marketContext.params.bidCharge || 0.05) + aggSpread / 2;
-    const askCharge = (marketContext.params.askCharge || 0.05) + aggSpread / 2;
+    const bidCharge = (marketContext.params.bidCharge || 0.05);
+    const askCharge = (marketContext.params.askCharge || 0.05);
 
-    const bidWashCharge = (marketContext.params.bidWashCharge || 0.03) + aggSpread / 2;
-    const askWasCharge = (marketContext.params.askWashCharge || 0.03) + aggSpread / 2;
-
-    const quoteSize = equity * sizePerc;
     let size = quoteSize / fairValue;
 
     const bestBid = bids.getBest();
     const bestAsk = asks.getBest();
-    const bidPriceAcceptable = fairValue * (1 - bidCharge);
-    const askPriceAcceptable = fairValue * (1 + askCharge);
+    const bidPrice = fairValue * (1 - bidCharge);
+    const askPrice = fairValue * (1 + askCharge);
 
-    const bidWashPrice = fairValue * (1 - bidWashCharge);
-    const askWashPrice = fairValue * (1 + askWasCharge);
 
 
     // TODO volatility adjustment
@@ -631,29 +619,35 @@ function makeMarketUpdateInstructions(
     message += `--- [IOC] ${marketContext.marketName} ---`;
     message += `\nfairValue: ${fairValue.toFixed(priceLotsDecimals)} - size: ${size.toFixed(baseLotsDecimals)} - `
         + `aggBid: ${aggBid.toFixed(priceLotsDecimals)} - aggAsk: ${aggAsk.toFixed(priceLotsDecimals)}`;
-    message += `\nbidPriceAcceptable: ${bidPriceAcceptable.toFixed(priceLotsDecimals)} - bidWashPrice: ${bidWashPrice.toFixed(priceLotsDecimals)} - `
+    message += `\nbidPriceAcceptable: ${bidPrice.toFixed(priceLotsDecimals)} - `
         + `bestBid: ${bestBid?.price.toFixed(priceLotsDecimals)} - size: ${bestBid?.size.toFixed(baseLotsDecimals)}`;
-    message += `\naskPriceAcceptable: ${askPriceAcceptable.toFixed(priceLotsDecimals)} - askWashPrice: ${askWashPrice.toFixed(priceLotsDecimals)} - `
+    message += `\naskPriceAcceptable: ${askPrice.toFixed(priceLotsDecimals)} - `
         + `bestAsk: ${bestAsk?.price.toFixed(priceLotsDecimals)} - size: ${bestAsk?.size.toFixed(baseLotsDecimals)}`;
 
     // when bidding over asking - shorting
     if (
         bestBid !== undefined &&
-        bestBid.price > askPriceAcceptable &&
-        bestBid.price > askWashPrice &&
-        bestBid.price > aggAsk &&
-        (bestBid.price * bestBid.size) > valueAcceptable
+        bestBid.price >= askPrice &&
+        bestBid.price >= aggAsk &&
+        (bestBid.price * bestBid.size) >= valueAcceptable
     ) {
         if (basePos !== 0) {
             if (basePos < 0) {
+                // fairValue = 10
+                // basePos = -5
+                // size = 10
+                // (100 - (-5*10))/10 => 150/10 => 15
                 size = (equity - (Math.abs(basePos) * fairValue)) / fairValue;
             } else {
-                size += Math.abs(basePos);
+                // basePos = 5
+                // size = 10
+                // size = 15?
+                size += basePos;
             }
         }
 
         const [modelBidPrice, nativeBidSize] = market.uiToNativePriceQuantity(
-            0,
+            askPrice,
             size,
         );
         const takerSell = makePlacePerpOrder2Instruction(
@@ -667,7 +661,7 @@ function makeMarketUpdateInstructions(
             market.asks,
             market.eventQueue,
             mangoAccount.getOpenOrdersKeysInBasketPacked(),
-            bestBid.priceLots,
+            modelBidPrice,
             nativeBidSize,
             I64_MAX_BN,
             new BN(Date.now()),
@@ -678,13 +672,13 @@ function makeMarketUpdateInstructions(
         );
         message += `\nTaker sell ${marketContext.marketName}`;
         message += `\nbestBidPrice: ${bestBid.price.toFixed(priceLotsDecimals)} - bestBidSize: ${bestBid.size.toFixed(baseLotsDecimals)} - total: ${(bestBid.price * bestBid.size).toFixed(priceLotsDecimals)}`;
-        message += `\nacceptableAskPrice: ${askPriceAcceptable.toFixed(priceLotsDecimals)} - basePos: ${basePos.toFixed(baseLotsDecimals)} - acceptableSize: ${size.toFixed(baseLotsDecimals)}`;
+        message += `\nacceptableAskPrice: ${askPrice.toFixed(priceLotsDecimals)} - basePos: ${basePos.toFixed(baseLotsDecimals)} - acceptableSize: ${size.toFixed(baseLotsDecimals)}`;
         if (posAsTradeSizes > -1) {
             message += `\nSelling ...`;
             console.log(message);
             instructions.push(takerSell);
         } else {
-            message += `\nNo sell due to basePos: ${basePos} > size: ${size}`;
+            message += `\nNo sell due to basePos: ${basePos.toFixed(baseLotsDecimals)} - size: ${(basePos * fairValue).toFixed(priceLotsDecimals)} >= ${size}`;
         }
         if (globalThis.lastSendTelegram === undefined) {
             telegramBot.telegram.sendMessage(telegramChannelId, message);
@@ -698,10 +692,9 @@ function makeMarketUpdateInstructions(
     // when asking over bidding - longing
     if (
         bestAsk !== undefined &&
-        bestAsk.price < bidPriceAcceptable &&
-        bestAsk.price < bidWashPrice &&
+        bestAsk.price < bidPrice &&
         bestAsk.price < aggBid &&
-        (bestAsk.price * bestAsk.size) > valueAcceptable
+        (bestAsk.price * bestAsk.size) >= valueAcceptable
     ) {
         if (basePos !== 0) {
             if (basePos > 0) {
@@ -712,7 +705,7 @@ function makeMarketUpdateInstructions(
         }
 
         const [modelAskPrice, nativeAskSize] = market.uiToNativePriceQuantity(
-            0,
+            bidPrice,
             size,
         );
         const takerBuy = makePlacePerpOrder2Instruction(
@@ -726,7 +719,7 @@ function makeMarketUpdateInstructions(
             market.asks,
             market.eventQueue,
             mangoAccount.getOpenOrdersKeysInBasketPacked(),
-            bestAsk.priceLots,
+            modelAskPrice,
             nativeAskSize,
             I64_MAX_BN,
             new BN(Date.now()),
@@ -737,13 +730,13 @@ function makeMarketUpdateInstructions(
         );
         message += `\nTaker buy ${marketContext.marketName}`;
         message += `\nbestAskPrice: ${bestAsk.price.toFixed(priceLotsDecimals)} - bestAskSize: ${bestAsk.size.toFixed(baseLotsDecimals)} - total: ${(bestAsk.price * bestAsk.size).toFixed(priceLotsDecimals)}`;
-        message += `\nacceptableBidPrice: ${bidPriceAcceptable.toFixed(priceLotsDecimals)} - basePos: ${basePos.toFixed(baseLotsDecimals)} - acceptableSize: ${size.toFixed(baseLotsDecimals)}`;
+        message += `\nacceptableBidPrice: ${bidPrice.toFixed(priceLotsDecimals)} - basePos: ${basePos.toFixed(baseLotsDecimals)} - acceptableSize: ${size.toFixed(baseLotsDecimals)}`;
         if (posAsTradeSizes < 1) {
             message += `\nBuying ...`;
             console.log(message);
             instructions.push(takerBuy);
         } else {
-            message += `\nNo sell due to basePos: ${basePos} > size: ${size}`;
+            message += `\nNo buy due to basePos: ${basePos.toFixed(baseLotsDecimals)} - size: ${(basePos * fairValue).toFixed(priceLotsDecimals)} >= ${size}`;
         }
         if (globalThis.lastSendTelegram === undefined) {
             telegramBot.telegram.sendMessage(telegramChannelId, message);
@@ -762,52 +755,13 @@ function makeMarketUpdateInstructions(
     }
 }
 
-async function onExit(
-    client: MangoClient,
-    payer: Account,
-    group: MangoGroup,
-    mangoAccount: MangoAccount,
-    marketContexts: MarketContext[],
-) {
-    await sleep(control.interval);
-    mangoAccount = await client.getMangoAccount(
-        mangoAccount.publicKey,
-        group.dexProgramId,
-    );
-    let tx = new Transaction();
-    const txProms: any[] = [];
-    for (let i = 0; i < marketContexts.length; i++) {
-        const mc = marketContexts[i];
-        const cancelAllInstr = makeCancelAllPerpOrdersInstruction(
-            mangoProgramId,
-            group.publicKey,
-            mangoAccount.publicKey,
-            payer.publicKey,
-            mc.market.publicKey,
-            mc.market.bids,
-            mc.market.asks,
-            new BN(20),
-        );
-        tx.add(cancelAllInstr);
-        if (tx.instructions.length === params.batch) {
-            txProms.push(client.sendTransaction(tx, payer, []));
-            tx = new Transaction();
-        }
-    }
-
-    if (tx.instructions.length) {
-        txProms.push(client.sendTransaction(tx, payer, []));
-    }
-    const txids = await Promise.all(txProms);
-    txids.forEach((txid) => {
-        console.log(`cancel successful: ${txid.toString()}`);
-    });
+async function onExit() {
     process.exit();
 }
 
-function startMarketMaker() {
+function startImmediatelyOrCancel() {
     if (control.isRunning) {
-        fullMarketMaker().finally(startMarketMaker);
+        fullImmediatelyOrCancel().finally(startImmediatelyOrCancel);
     }
 }
 
@@ -821,4 +775,4 @@ process.on('unhandledRejection', function (err, promise) {
     );
 });
 
-startMarketMaker();
+startImmediatelyOrCancel();
