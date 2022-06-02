@@ -621,9 +621,11 @@ function makeMarketUpdateInstructions(
         Math.abs(basePos) > (size / sizePressure)
     ) {
         if (basePos > 0) {
-            askCharge = (marketContext.params.askChargeHit || 0.009);
+            askCharge = (marketContext.params.chargeHit || 0.009);
+            bidCharge = (marketContext.params.opChargeHit || 0.023)
         } else {
-            bidCharge = (marketContext.params.bidChargeHit || 0.009);
+            bidCharge = (marketContext.params.chargeHit || 0.009);
+            askCharge = (marketContext.params.opChargeHit || 0.023)
         }
     }
 
