@@ -138,6 +138,7 @@ async function listenBinanceBooks(books: MultiBook[]) {
     'BNBUSDT',
     'AVAXUSDT',
     'ADAUSDT',
+    'GMTUSDT',
   ];
   const systemMarketToNativeMarket = function (systemMarket: string) { return `${systemMarket.split('-')[0]}USDT` };
   const marketNames = books.map((book) => book.marketName).filter((mn) =>
