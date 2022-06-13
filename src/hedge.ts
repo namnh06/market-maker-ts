@@ -7,6 +7,7 @@ import {
 } from '@solana/web3.js';
 import fs from 'fs';
 import os from 'os';
+import child_process from 'child_process';
 import {
     Cluster,
     Config,
@@ -35,6 +36,7 @@ import {
     loadMangoAccountWithPubkey,
     makeInitSequenceInstruction,
     seqEnforcerProgramId,
+    listenersArray,
 } from './utils';
 import { findProgramAddressSync } from '@project-serum/anchor/dist/cjs/utils/pubkey';
 
@@ -82,8 +84,17 @@ type MarketContext = {
     spotMarket: Market;
     marketIndex: number;
 
+    aggBid: number | undefined;
+    aggAsk: number | undefined;
+
     sequenceAccount: PublicKey;
     sequenceAccountBump: number;
+};
+type ListenerMessage = {
+    marketName: string;
+    aggBid: number;
+    aggAsk: number;
+    ftxMid: number;
 };
 
 /**
@@ -264,6 +275,8 @@ async function hedging() {
             spotConfig: spotMarketConfig,
             spotMarket: spotMarket,
             marketIndex: perpMarketConfig.marketIndex,
+            aggBid: undefined,
+            aggAsk: undefined,
 
             sequenceAccount,
             sequenceAccountBump,
@@ -273,6 +286,15 @@ async function hedging() {
     const symbolToContext = Object.fromEntries(
         marketContexts.map((mc) => [mc.marketName, mc]),
     );
+
+    const mdListeners: child_process.ChildProcess[] = listenersArray(params.processes, Object.keys(params.assets)).map((assetArray) => {
+        const listener = child_process.fork(require.resolve('./listen'), [assetArray.map((a) => `${a}-PERP`).join(',')]);
+        listener.on('message', (m: ListenerMessage) => {
+            symbolToContext[m.marketName].aggBid = m.aggBid;
+            symbolToContext[m.marketName].aggAsk = m.aggAsk;
+        });
+        return listener;
+    })
 
     const state = await loadAccountAndMarketState(
         connection,
@@ -528,7 +550,13 @@ async function makeMarketUpdateInstructions(
             }
         }
         let price: number;
-        const fairValue = group.getPrice(marketIndex, cache).toNumber();
+        const aggBid = marketContext.aggBid;
+        const aggAsk = marketContext.aggAsk;
+        if (aggBid === undefined || aggAsk === undefined) {
+            console.log(`${marketContext.marketName} No Agg Book`);
+            return [];
+        }
+        const fairValue = (aggBid + aggAsk) / 2;
         let charge: number = marketContext.params.charge || 0.005;
         if (charge > 0.01) {
             console.warn(`[Warning] Charge is larger than 1%`);
