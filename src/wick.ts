@@ -692,7 +692,11 @@ function makeMarketUpdateInstructions(
         const openOrders = mangoAccount
             .getPerpOpenOrders()
             .filter((o) => o.marketIndex === marketIndex);
-        moveOrders = openOrders.length < 2 || openOrders.length > 2;
+        if (bidSize <= 0 || askSize <= 0) {
+            moveOrders = openOrders.length < 1 || openOrders.length >= 2;
+        } else {
+            moveOrders = openOrders.length < 2 || openOrders.length > 2;
+        }
         for (const o of openOrders) {
             const refPrice = o.side === 'buy' ? bookAdjBid : bookAdjAsk;
             moveOrders =
